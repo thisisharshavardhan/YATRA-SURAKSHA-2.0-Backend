@@ -12,12 +12,14 @@ const alertSchema = new mongoose.Schema({
         type: {
             type: String,
             enum: ['Point'],
-            required: true,
             default: 'Point'
         },
         coordinates: {
             type: [Number], // [longitude, latitude]
-            required: true
+            required: function() {
+                // Location required for SOS and geofence alerts, optional for low_battery
+                return this.alertType !== 'low_battery';
+            }
         }
     },
     status: {
