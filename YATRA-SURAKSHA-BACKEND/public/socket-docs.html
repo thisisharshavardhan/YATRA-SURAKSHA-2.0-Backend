@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yatra Suraksha Socket.IO Documentation</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        @media (max-width: 1200px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        
+        .card {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .namespace-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        .user-badge { background: #4CAF50; }
+        .admin-badge { background: #f44336; }
+        
+        .connection-panel {
+            background: #0f3460;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+        
+        .input-group input, .input-group textarea, .input-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #334;
+            border-radius: 6px;
+            background: #1a1a2e;
+            color: #fff;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .input-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary { background: #667eea; color: white; }
+        .btn-success { background: #4CAF50; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-warning { background: #ff9800; color: white; }
+        
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .status.connected { background: rgba(76, 175, 80, 0.2); }
+        .status.connected .status-dot { background: #4CAF50; }
+        
+        .status.disconnected { background: rgba(244, 67, 54, 0.2); }
+        .status.disconnected .status-dot { background: #f44336; }
+        
+        .events-section {
+            margin-top: 25px;
+        }
+        
+        .event-card {
+            background: #0f3460;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        
+        .event-header {
+            padding: 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+        
+        .event-header:hover { background: rgba(255,255,255,0.05); }
+        
+        .event-name {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .event-direction {
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+        
+        .emit { background: #4CAF50; color: white; }
+        .listen { background: #2196F3; color: white; }
+        
+        .event-body {
+            padding: 0 15px 15px;
+            display: none;
+        }
+        
+        .event-body.show { display: block; }
+        
+        .event-description {
+            color: #aaa;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+        
+        .code-block {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin-bottom: 15px;
+        }
+        
+        .code-block pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+        
+        .code-label {
+            color: #aaa;
+            font-size: 0.8rem;
+            margin-bottom: 5px;
+        }
+        
+        .logs-panel {
+            background: #0a0a15;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+        }
+        
+        .log-entry {
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border-left: 3px solid;
+        }
+        
+        .log-emit { background: rgba(76, 175, 80, 0.1); border-color: #4CAF50; }
+        .log-receive { background: rgba(33, 150, 243, 0.1); border-color: #2196F3; }
+        .log-error { background: rgba(244, 67, 54, 0.1); border-color: #f44336; }
+        .log-info { background: rgba(156, 39, 176, 0.1); border-color: #9C27B0; }
+        
+        .log-time {
+            color: #666;
+            font-size: 0.75rem;
+        }
+        
+        .log-event {
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            background: #0f3460;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            color: #aaa;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .quick-action-btn {
+            padding: 10px;
+            font-size: 0.85rem;
+        }
+        
+        .test-panel {
+            background: #0f3460;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .test-panel h3 {
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛡️ Yatra Suraksha Socket.IO</h1>
+        <p>Real-time Location Sharing & Emergency Alerts</p>
+    </div>
+    
+    <div class="container">
+        <div class="grid">
+            <!-- User Namespace Panel -->
+            <div class="card">
+                <h2>
+                    <span class="namespace-badge user-badge">/user</span>
+                    User Namespace
+                </h2>
+                
+                <div class="connection-panel">
+                    <div id="userStatus" class="status disconnected">
+                        <span class="status-dot"></span>
+                        <span>Disconnected</span>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>Firebase ID Token</label>
+                        <input type="text" id="userToken" placeholder="Enter your Firebase ID token">
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn btn-success" onclick="connectUser()">Connect</button>
+                        <button class="btn btn-danger" onclick="disconnectUser()" disabled id="userDisconnectBtn">Disconnect</button>
+                        <button class="btn btn-warning" onclick="refreshGroups()" disabled id="refreshGroupsBtn">🔄 Refresh Groups</button>
+                    </div>
+                </div>
+                
+                <div class="events-section">
+                    <h3 style="margin-bottom: 15px; color: #aaa;">📡 Events</h3>
+                    
+                    <!-- group:refresh -->
+                    <div class="event-card" style="border: 2px solid #ff9800;">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">group:refresh</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body show">
+                            <p class="event-description">⚠️ <strong>IMPORTANT:</strong> Call this after joining/creating a group via REST API to sync your socket rooms. Without this, you won't receive location broadcasts from group members.</p>
+                            <button class="btn btn-warning" onclick="refreshGroups()">🔄 Refresh My Groups</button>
+                        </div>
+                    </div>
+                    
+                    <!-- location:update -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">location:update</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Send your current location. This saves to database and broadcasts to your group members.</p>
+                            <div class="code-label">Payload:</div>
+                            <div class="code-block">
+<pre>{
+  "latitude": 28.6139,
+  "longitude": 77.2090,
+  "accuracy": 10,
+  "speed": 5.5,
+  "heading": 180,
+  "altitude": 200,
+  "batteryLevel": 85,
+  "isCharging": true,
+  "activityType": "walking"
+}</pre>
+                            </div>
+                            <div class="input-group">
+                                <textarea id="locationPayload">{
+  "latitude": 28.6139,
+  "longitude": 77.2090,
+  "accuracy": 10,
+  "batteryLevel": 85
+}</textarea>
+                            </div>
+                            <button class="btn btn-primary" onclick="emitUserEvent('location:update', 'locationPayload')">Send Location</button>
+                        </div>
+                    </div>
+                    
+                    <!-- location:get-group -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">location:get-group</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Get current locations of all members in a group.</p>
+                            <div class="code-label">Payload:</div>
+                            <div class="code-block">
+<pre>{
+  "groupId": "group_id_here"
+}</pre>
+                            </div>
+                            <div class="input-group">
+                                <textarea id="getGroupPayload">{
+  "groupId": ""
+}</textarea>
+                            </div>
+                            <button class="btn btn-primary" onclick="emitUserEvent('location:get-group', 'getGroupPayload')">Get Group Locations</button>
+                        </div>
+                    </div>
+                    
+                    <!-- location:stop -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">location:stop</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Stop sharing your location. Notifies group members that you went offline.</p>
+                            <button class="btn btn-warning" onclick="emitUserEventNoPayload('location:stop')">Stop Sharing</button>
+                        </div>
+                    </div>
+                    
+                    <!-- sos:trigger -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">sos:trigger</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">⚠️ EMERGENCY! Trigger SOS alert. Notifies all group members and admins.</p>
+                            <div class="code-label">Payload:</div>
+                            <div class="code-block">
+<pre>{
+  "location": {
+    "latitude": 28.6139,
+    "longitude": 77.2090
+  },
+  "message": "I need help!",
+  "alertType": "sos"
+}</pre>
+                            </div>
+                            <div class="input-group">
+                                <textarea id="sosPayload">{
+  "location": {
+    "latitude": 28.6139,
+    "longitude": 77.2090
+  },
+  "message": "Emergency! Please help!",
+  "alertType": "sos"
+}</textarea>
+                            </div>
+                            <button class="btn btn-danger" onclick="emitUserEvent('sos:trigger', 'sosPayload')">🆘 Trigger SOS</button>
+                        </div>
+                    </div>
+                    
+                    <!-- sos:cancel -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">sos:cancel</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Cancel your active SOS alert.</p>
+                            <div class="input-group">
+                                <label>Alert ID</label>
+                                <input type="text" id="cancelAlertId" placeholder="Alert ID to cancel">
+                            </div>
+                            <button class="btn btn-warning" onclick="cancelSOS()">Cancel SOS</button>
+                        </div>
+                    </div>
+                    
+                    <!-- alert:low-battery -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">alert:low-battery</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Send low battery alert to group members.</p>
+                            <div class="code-label">Payload:</div>
+                            <div class="code-block">
+<pre>{
+  "batteryLevel": 15,
+  "location": {
+    "latitude": 28.6139,
+    "longitude": 77.2090
+  }
+}</pre>
+                            </div>
+                            <div class="input-group">
+                                <textarea id="batteryPayload">{
+  "batteryLevel": 10,
+  "location": {
+    "latitude": 28.6139,
+    "longitude": 77.2090
+  }
+}</textarea>
+                            </div>
+                            <button class="btn btn-warning" onclick="emitUserEvent('alert:low-battery', 'batteryPayload')">Send Low Battery</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Incoming Events -->
+                    <h3 style="margin: 25px 0 15px; color: #aaa;">📥 Incoming Events</h3>
+                    
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">location:updated</span>
+                            <span class="event-direction listen">LISTEN</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Received when a group member updates their location.</p>
+                            <div class="code-label">Response:</div>
+                            <div class="code-block">
+<pre>{
+  "userId": "user_id",
+  "userName": "John Doe",
+  "location": { "lat": 28.6139, "lng": 77.2090 },
+  "batteryLevel": 85,
+  "timestamp": "2024-01-01T12:00:00.000Z"
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">group:member-joined / group:member-left</span>
+                            <span class="event-direction listen">LISTEN</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Received when a group member comes online or goes offline.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">sos:alert</span>
+                            <span class="event-direction listen">LISTEN</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">⚠️ Received when a group member triggers SOS.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">alert:battery-warning</span>
+                            <span class="event-direction listen">LISTEN</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Received when a group member has low battery.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Admin Namespace Panel -->
+            <div class="card">
+                <h2>
+                    <span class="namespace-badge admin-badge">/admin</span>
+                    Admin Namespace
+                </h2>
+                
+                <div class="connection-panel">
+                    <div id="adminStatus" class="status disconnected">
+                        <span class="status-dot"></span>
+                        <span>Disconnected</span>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>Admin Firebase ID Token (role: admin required)</label>
+                        <input type="text" id="adminToken" placeholder="Enter admin Firebase ID token">
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button class="btn btn-success" onclick="connectAdmin()">Connect</button>
+                        <button class="btn btn-danger" onclick="disconnectAdmin()" disabled id="adminDisconnectBtn">Disconnect</button>
+                    </div>
+                </div>
+                
+                <div class="events-section">
+                    <h3 style="margin-bottom: 15px; color: #aaa;">📡 Admin Events</h3>
+                    
+                    <!-- admin:get-all-locations -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">admin:get-all-locations</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Get current locations of all online users.</p>
+                            <button class="btn btn-primary" onclick="emitAdminEventNoPayload('admin:get-all-locations')">Get All Locations</button>
+                        </div>
+                    </div>
+                    
+                    <!-- admin:get-user-location -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">admin:get-user-location</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Get location of a specific user.</p>
+                            <div class="input-group">
+                                <label>User ID</label>
+                                <input type="text" id="adminUserId" placeholder="User ID to track">
+                            </div>
+                            <button class="btn btn-primary" onclick="getSpecificUserLocation()">Get User Location</button>
+                        </div>
+                    </div>
+                    
+                    <!-- admin:get-active-alerts -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">admin:get-active-alerts</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Get all active/unresolved alerts.</p>
+                            <button class="btn btn-danger" onclick="emitAdminEventNoPayload('admin:get-active-alerts')">Get Active Alerts</button>
+                        </div>
+                    </div>
+                    
+                    <!-- admin:resolve-alert -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">admin:resolve-alert</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Resolve/close an alert.</p>
+                            <div class="input-group">
+                                <label>Alert ID</label>
+                                <input type="text" id="resolveAlertId" placeholder="Alert ID to resolve">
+                            </div>
+                            <div class="input-group">
+                                <label>Resolution Notes</label>
+                                <input type="text" id="resolveNotes" placeholder="Resolution notes (optional)">
+                            </div>
+                            <button class="btn btn-success" onclick="resolveAlert()">Resolve Alert</button>
+                        </div>
+                    </div>
+                    
+                    <!-- admin:get-groups -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">admin:get-groups</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Get all active groups.</p>
+                            <button class="btn btn-primary" onclick="emitAdminEventNoPayload('admin:get-groups')">Get Groups</button>
+                        </div>
+                    </div>
+                    
+                    <!-- admin:get-group-locations -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">admin:get-group-locations</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Get all member locations for a specific group.</p>
+                            <div class="input-group">
+                                <label>Group ID</label>
+                                <input type="text" id="adminGroupId" placeholder="Group ID">
+                            </div>
+                            <button class="btn btn-primary" onclick="getGroupLocations()">Get Group Locations</button>
+                        </div>
+                    </div>
+                    
+                    <!-- admin:subscribe-user -->
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">admin:subscribe-user</span>
+                            <span class="event-direction emit">EMIT</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Subscribe to real-time updates from a specific user.</p>
+                            <div class="input-group">
+                                <label>User ID to Subscribe</label>
+                                <input type="text" id="subscribeUserId" placeholder="User ID">
+                            </div>
+                            <button class="btn btn-primary" onclick="subscribeToUser()">Subscribe</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Incoming Admin Events -->
+                    <h3 style="margin: 25px 0 15px; color: #aaa;">📥 Real-time Updates</h3>
+                    
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">admin:user-location-update</span>
+                            <span class="event-direction listen">LISTEN</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">Real-time location updates from all online users.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">admin:new-alert</span>
+                            <span class="event-direction listen">LISTEN</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">⚠️ New SOS or emergency alert triggered.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="event-card">
+                        <div class="event-header" onclick="toggleEvent(this)">
+                            <span class="event-name">admin:user-connected / admin:user-disconnected</span>
+                            <span class="event-direction listen">LISTEN</span>
+                        </div>
+                        <div class="event-body">
+                            <p class="event-description">User connection status changes.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Logs Panel -->
+        <div class="card" style="margin-top: 30px;">
+            <h2>📋 Event Logs</h2>
+            <div class="btn-group" style="margin-bottom: 15px;">
+                <button class="btn btn-danger" onclick="clearLogs()">Clear Logs</button>
+            </div>
+            <div class="logs-panel" id="logsPanel">
+                <div class="log-entry log-info">
+                    <span class="log-time">--:--:--</span>
+                    <span class="log-event">System</span>
+                    <div>Ready to connect. Enter your Firebase token and click Connect.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Yatra Suraksha Socket.IO Documentation | <a href="/api-docs" style="color: #667eea;">REST API Docs</a></p>
+    </div>
+    
+    <script>
+        let userSocket = null;
+        let adminSocket = null;
+        
+        const SERVER_URL = window.location.origin;
+        
+        function log(type, event, data) {
+            const logsPanel = document.getElementById('logsPanel');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.innerHTML = `
+                <span class="log-time">${time}</span>
+                <span class="log-event">${event}</span>
+                <div>${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}</div>
+            `;
+            logsPanel.insertBefore(entry, logsPanel.firstChild);
+        }
+        
+        function clearLogs() {
+            document.getElementById('logsPanel').innerHTML = '';
+            log('info', 'System', 'Logs cleared');
+        }
+        
+        function toggleEvent(header) {
+            const body = header.nextElementSibling;
+            body.classList.toggle('show');
+        }
+        
+        function updateStatus(elementId, connected) {
+            const el = document.getElementById(elementId);
+            el.className = `status ${connected ? 'connected' : 'disconnected'}`;
+            el.querySelector('span:last-child').textContent = connected ? 'Connected' : 'Disconnected';
+        }
+        
+        // User Namespace
+        function connectUser() {
+            const token = document.getElementById('userToken').value.trim();
+            if (!token) {
+                log('error', 'Error', 'Please enter a Firebase token');
+                return;
+            }
+            
+            userSocket = io(`${SERVER_URL}/user`, {
+                auth: { token }
+            });
+            
+            userSocket.on('connect', () => {
+                updateStatus('userStatus', true);
+                document.getElementById('userDisconnectBtn').disabled = false;
+                document.getElementById('refreshGroupsBtn').disabled = false;
+                log('info', 'Connected', `Socket ID: ${userSocket.id}`);
+            });
+            
+            userSocket.on('disconnect', (reason) => {
+                updateStatus('userStatus', false);
+                document.getElementById('userDisconnectBtn').disabled = true;
+                document.getElementById('refreshGroupsBtn').disabled = true;
+                log('info', 'Disconnected', reason);
+            });
+            
+            userSocket.on('connect_error', (err) => {
+                log('error', 'Connection Error', err.message);
+            });
+            
+            // Listen to all user events
+            userSocket.on('connected', (data) => log('receive', 'connected', data));
+            userSocket.on('location:updated', (data) => log('receive', 'location:updated', data));
+            userSocket.on('location:broadcast', (data) => log('receive', 'location:broadcast', data));
+            userSocket.on('location:group-members', (data) => log('receive', 'location:group-members', data));
+            userSocket.on('location:stopped', (data) => log('receive', 'location:stopped', data));
+            userSocket.on('location:stop-confirmed', (data) => log('receive', 'location:stop-confirmed', data));
+            userSocket.on('group:refreshed', (data) => log('receive', 'group:refreshed', data));
+            userSocket.on('member:online', (data) => log('receive', 'member:online', data));
+            userSocket.on('member:offline', (data) => log('receive', 'member:offline', data));
+            userSocket.on('group:member-joined', (data) => log('receive', 'group:member-joined', data));
+            userSocket.on('group:member-left', (data) => log('receive', 'group:member-left', data));
+            userSocket.on('sos:alert', (data) => log('receive', 'sos:alert', data));
+            userSocket.on('sos:confirmed', (data) => log('receive', 'sos:confirmed', data));
+            userSocket.on('sos:cancelled', (data) => log('receive', 'sos:cancelled', data));
+            userSocket.on('sos:resolved', (data) => log('receive', 'sos:resolved', data));
+            userSocket.on('sos:emergency-contact', (data) => log('receive', 'sos:emergency-contact', data));
+            userSocket.on('alert:low-battery', (data) => log('receive', 'alert:low-battery', data));
+            userSocket.on('error', (data) => log('error', 'Error', data));
+            userSocket.on('success', (data) => log('receive', 'Success', data));
+        }
+        
+        function disconnectUser() {
+            if (userSocket) {
+                userSocket.disconnect();
+                userSocket = null;
+            }
+        }
+        
+        function refreshGroups() {
+            if (!userSocket?.connected) {
+                log('error', 'Error', 'Not connected to user namespace');
+                return;
+            }
+            userSocket.emit('group:refresh');
+            log('emit', 'group:refresh', '(refreshing group memberships)');
+        }
+        
+        function emitUserEvent(event, payloadId) {
+            if (!userSocket?.connected) {
+                log('error', 'Error', 'Not connected to user namespace');
+                return;
+            }
+            try {
+                const payload = JSON.parse(document.getElementById(payloadId).value);
+                userSocket.emit(event, payload);
+                log('emit', event, payload);
+            } catch (e) {
+                log('error', 'Parse Error', e.message);
+            }
+        }
+        
+        function emitUserEventNoPayload(event) {
+            if (!userSocket?.connected) {
+                log('error', 'Error', 'Not connected to user namespace');
+                return;
+            }
+            userSocket.emit(event);
+            log('emit', event, '(no payload)');
+        }
+        
+        function cancelSOS() {
+            if (!userSocket?.connected) {
+                log('error', 'Error', 'Not connected');
+                return;
+            }
+            const alertId = document.getElementById('cancelAlertId').value.trim();
+            if (!alertId) {
+                log('error', 'Error', 'Please enter an alert ID');
+                return;
+            }
+            userSocket.emit('sos:cancel', { alertId });
+            log('emit', 'sos:cancel', { alertId });
+        }
+        
+        // Admin Namespace
+        function connectAdmin() {
+            const token = document.getElementById('adminToken').value.trim();
+            if (!token) {
+                log('error', 'Error', 'Please enter an admin Firebase token');
+                return;
+            }
+            
+            adminSocket = io(`${SERVER_URL}/admin`, {
+                auth: { token }
+            });
+            
+            adminSocket.on('connect', () => {
+                updateStatus('adminStatus', true);
+                document.getElementById('adminDisconnectBtn').disabled = false;
+                log('info', 'Admin Connected', `Socket ID: ${adminSocket.id}`);
+            });
+            
+            adminSocket.on('disconnect', (reason) => {
+                updateStatus('adminStatus', false);
+                document.getElementById('adminDisconnectBtn').disabled = true;
+                log('info', 'Admin Disconnected', reason);
+            });
+            
+            adminSocket.on('connect_error', (err) => {
+                log('error', 'Admin Connection Error', err.message);
+            });
+            
+            // Listen to all admin events
+            adminSocket.on('admin:all-locations', (data) => log('receive', 'admin:all-locations', data));
+            adminSocket.on('admin:user-location', (data) => log('receive', 'admin:user-location', data));
+            adminSocket.on('admin:user-location-update', (data) => log('receive', 'admin:user-location-update', data));
+            adminSocket.on('admin:active-alerts', (data) => log('receive', 'admin:active-alerts', data));
+            adminSocket.on('admin:new-alert', (data) => log('receive', 'admin:new-alert', data));
+            adminSocket.on('admin:alert-resolved', (data) => log('receive', 'admin:alert-resolved', data));
+            adminSocket.on('admin:groups', (data) => log('receive', 'admin:groups', data));
+            adminSocket.on('admin:group-locations', (data) => log('receive', 'admin:group-locations', data));
+            adminSocket.on('admin:user-connected', (data) => log('receive', 'admin:user-connected', data));
+            adminSocket.on('admin:user-disconnected', (data) => log('receive', 'admin:user-disconnected', data));
+            adminSocket.on('error', (data) => log('error', 'Admin Error', data));
+            adminSocket.on('success', (data) => log('receive', 'Admin Success', data));
+        }
+        
+        function disconnectAdmin() {
+            if (adminSocket) {
+                adminSocket.disconnect();
+                adminSocket = null;
+            }
+        }
+        
+        function emitAdminEventNoPayload(event) {
+            if (!adminSocket?.connected) {
+                log('error', 'Error', 'Not connected to admin namespace');
+                return;
+            }
+            adminSocket.emit(event);
+            log('emit', event, '(no payload)');
+        }
+        
+        function getSpecificUserLocation() {
+            if (!adminSocket?.connected) {
+                log('error', 'Error', 'Not connected');
+                return;
+            }
+            const userId = document.getElementById('adminUserId').value.trim();
+            if (!userId) {
+                log('error', 'Error', 'Please enter a user ID');
+                return;
+            }
+            adminSocket.emit('admin:get-user-location', { userId });
+            log('emit', 'admin:get-user-location', { userId });
+        }
+        
+        function resolveAlert() {
+            if (!adminSocket?.connected) {
+                log('error', 'Error', 'Not connected');
+                return;
+            }
+            const alertId = document.getElementById('resolveAlertId').value.trim();
+            const notes = document.getElementById('resolveNotes').value.trim();
+            if (!alertId) {
+                log('error', 'Error', 'Please enter an alert ID');
+                return;
+            }
+            adminSocket.emit('admin:resolve-alert', { alertId, notes });
+            log('emit', 'admin:resolve-alert', { alertId, notes });
+        }
+        
+        function getGroupLocations() {
+            if (!adminSocket?.connected) {
+                log('error', 'Error', 'Not connected');
+                return;
+            }
+            const groupId = document.getElementById('adminGroupId').value.trim();
+            if (!groupId) {
+                log('error', 'Error', 'Please enter a group ID');
+                return;
+            }
+            adminSocket.emit('admin:get-group-locations', { groupId });
+            log('emit', 'admin:get-group-locations', { groupId });
+        }
+        
+        function subscribeToUser() {
+            if (!adminSocket?.connected) {
+                log('error', 'Error', 'Not connected');
+                return;
+            }
+            const userId = document.getElementById('subscribeUserId').value.trim();
+            if (!userId) {
+                log('error', 'Error', 'Please enter a user ID');
+                return;
+            }
+            adminSocket.emit('admin:subscribe-user', { userId });
+            log('emit', 'admin:subscribe-user', { userId });
+        }
+    </script>
+</body>
+</html>

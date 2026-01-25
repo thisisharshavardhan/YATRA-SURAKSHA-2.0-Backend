@@ -3,6 +3,7 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
+import { createServer } from 'http';
 import swaggerUi from 'swagger-ui-express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -10,6 +11,7 @@ import { dirname, join } from 'path';
 import connectDB from './Dbs/index.db.js';
 import { errorHandler, notFoundHandler } from './Middlewares/error.middleware.js';
 import swaggerSpec from './Configs/swagger.config.js';
+import { initializeSocket } from './Sockets/index.socket.js';
 
 // Import routes
 import authRoutes from './Routes/auth.routes.js';
@@ -28,7 +30,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 3000;
+
+let io = null;
 
 // Middleware
 app.use(cors({
@@ -38,7 +43,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files (for test-auth.html)
+// Serve static files
 app.use(express.static(join(__dirname, '../public')));
 
 // Swagger API Documentation
@@ -47,7 +52,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     customSiteTitle: 'Yatra Suraksha API Docs'
 }));
 
-// Swagger JSON endpoint (for tools like Postman)
+// Swagger JSON endpoint
 app.get('/api-docs.json', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerSpec);
@@ -59,8 +64,21 @@ app.get('/', (req, res) => {
         success: true,
         message: 'Yatra Suraksha Backend is running!',
         timestamp: new Date().toISOString(),
-        docs: '/api-docs'
+        endpoints: {
+            restApi: '/api-docs',
+            socketDocs: '/socket-docs',
+            userSocket: 'ws://localhost:' + PORT + '/user',
+            adminSocket: 'ws://localhost:' + PORT + '/admin'
+        },
+        stats: {
+            onlineUsers: io?.getOnlineUsersCount?.() || 0
+        }
     });
+});
+
+// Socket.IO Documentation
+app.get('/socket-docs', (req, res) => {
+    res.sendFile(join(__dirname, '../public/socket-docs.html'));
 });
 
 // API Routes
@@ -73,17 +91,23 @@ app.use('/api/geofences', geofenceRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/safety-scores', safetyScoreRoutes);
 
-// 404 handler (after all routes)
+// 404 handler
 app.use(notFoundHandler);
 
-// Global error handler (must be last)
+// Global error handler
 app.use(errorHandler);
 
 connectDB().then(() => {
-    app.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`);
-        console.log(`API Docs: http://localhost:${PORT}/api-docs`);
+    io = initializeSocket(server);
+    app.set('io', io);
+
+    server.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`REST API Docs: http://localhost:${PORT}/api-docs`);
+        console.log(`Socket.IO Docs: http://localhost:${PORT}/socket-docs`);
+        console.log(`User Socket: ws://localhost:${PORT}/user`);
+        console.log(`Admin Socket: ws://localhost:${PORT}/admin`);
     });
 }).catch((error) => {
-    console.error('Failed to connect to the database:', error);
+    console.error('Database connection failed:', error);
 });
