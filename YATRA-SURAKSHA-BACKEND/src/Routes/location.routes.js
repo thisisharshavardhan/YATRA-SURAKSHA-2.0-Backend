@@ -24,7 +24,7 @@ router.use(authenticate);
  *     description: Save current GPS location for the authenticated user
  *     tags: [Locations]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -103,7 +103,7 @@ router.post('/', updateLocation);
  *     description: Upload multiple location points at once (useful for offline sync)
  *     tags: [Locations]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -173,7 +173,7 @@ router.post('/batch', batchUpdateLocations);
  *     description: Get the most recent location of the authenticated user
  *     tags: [Locations]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Latest location
@@ -201,7 +201,7 @@ router.get('/me', getMyLocation);
  *     description: Get location history for the authenticated user with pagination
  *     tags: [Locations]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: startDate
@@ -266,7 +266,7 @@ router.get('/history', getMyLocationHistory);
  *     description: Delete user's location history for privacy
  *     tags: [Locations]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: before
@@ -304,7 +304,7 @@ router.delete('/history', deleteLocationHistory);
  *     description: Find users within a certain radius of a location
  *     tags: [Locations]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: longitude
@@ -378,7 +378,7 @@ router.get('/nearby', findNearbyUsers);
  *     description: Get latest locations for a list of users (for group tracking)
  *     tags: [Locations]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -440,7 +440,7 @@ router.post('/users', getMultipleUsersLocations);
  *     description: Get another user's latest location (requires permission)
  *     tags: [Locations]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: userId

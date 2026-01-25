@@ -23,7 +23,7 @@ router.use(authenticate);
  *     description: Returns the full profile of the authenticated user
  *     tags: [Users]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: User profile data
@@ -49,7 +49,7 @@ router.get('/profile', getProfile);
  *     description: Updates the authenticated user's profile information
  *     tags: [Users]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -113,7 +113,7 @@ router.put('/profile', updateProfile);
  *     description: Updates the user's emergency contacts list (max 5 contacts)
  *     tags: [Users]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -173,7 +173,7 @@ router.put('/emergency-contacts', updateEmergencyContacts);
  *     description: Updates the user's health and medical information
  *     tags: [Users]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -226,7 +226,7 @@ router.put('/health-info', updateHealthInfo);
  *     description: Updates app permissions for location, notifications, and SMS access
  *     tags: [Users]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -270,7 +270,7 @@ router.put('/permissions', updatePermissions);
  *     description: Search for users by email or phone number (min 3 characters)
  *     tags: [Users]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: q
@@ -320,7 +320,7 @@ router.get('/search', searchUsers);
  *     description: Retrieves a user's public profile by their ID
  *     tags: [Users]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id

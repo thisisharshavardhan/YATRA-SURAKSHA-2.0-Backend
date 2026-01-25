@@ -26,7 +26,7 @@ router.use(authenticate);
  *     description: Trigger an emergency SOS alert with current location. This is the primary panic button functionality.
  *     tags: [Alerts]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -102,7 +102,7 @@ router.post('/sos', triggerSOS);
  *       - >15% = low
  *     tags: [Alerts]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -160,7 +160,7 @@ router.post('/low-battery', triggerLowBatteryAlert);
  *       - `exit_safety_geofence` - User left a designated safe zone
  *     tags: [Alerts]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -240,7 +240,7 @@ router.post('/geofence', triggerGeofenceAlert);
  *     description: Get all alerts for the authenticated user with pagination
  *     tags: [Alerts]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: status
@@ -293,7 +293,7 @@ router.get('/me', getMyAlerts);
  *     description: Get aggregated statistics of alerts for the current user
  *     tags: [Alerts]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Alert statistics
@@ -334,7 +334,7 @@ router.get('/stats', getAlertStats);
  *     description: Find active alerts within a radius of a location
  *     tags: [Alerts]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: longitude
@@ -403,7 +403,7 @@ router.get('/nearby', getNearbyAlerts);
  *     description: Get alerts from users who have listed me as emergency contact or are in my groups
  *     tags: [Alerts]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: status
@@ -438,7 +438,7 @@ router.get('/contacts', getContactsAlerts);
  *     description: Admin endpoint to view all alerts in the system
  *     tags: [Alerts]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: status
@@ -493,7 +493,7 @@ router.get('/admin/all', isAdmin, getAllAlerts);
  *     description: Get detailed information about a specific alert
  *     tags: [Alerts]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -530,7 +530,7 @@ router.get('/:id', getAlertById);
  *     description: Mark an active alert as resolved or cancelled
  *     tags: [Alerts]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id

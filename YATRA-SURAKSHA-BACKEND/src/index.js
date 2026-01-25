@@ -16,6 +16,10 @@ import authRoutes from './Routes/auth.routes.js';
 import userRoutes from './Routes/user.routes.js';
 import locationRoutes from './Routes/location.routes.js';
 import alertRoutes from './Routes/alert.routes.js';
+import groupRoutes from './Routes/group.routes.js';
+import geofenceRoutes from './Routes/geofence.routes.js';
+import tripRoutes from './Routes/trip.routes.js';
+import safetyScoreRoutes from './Routes/safetyScore.routes.js';
 
 // Initialize Firebase
 import './Configs/firebase.config.js';
@@ -64,6 +68,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/alerts', alertRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/geofences', geofenceRoutes);
+app.use('/api/trips', tripRoutes);
+app.use('/api/safety-scores', safetyScoreRoutes);
 
 // 404 handler (after all routes)
 app.use(notFoundHandler);

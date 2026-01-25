@@ -83,7 +83,7 @@ groupSchema.statics.generateJoinCode = async function() {
 };
 
 // Pre-save hook to add creator as admin
-groupSchema.pre('save', function(next) {
+groupSchema.pre('save', function() {
     if (this.isNew && this.createdBy) {
         const creatorExists = this.members.some(
             m => m.userID.toString() === this.createdBy.toString()
@@ -95,7 +95,6 @@ groupSchema.pre('save', function(next) {
             });
         }
     }
-    next();
 });
 
 const Group = mongoose.model('Group', groupSchema);

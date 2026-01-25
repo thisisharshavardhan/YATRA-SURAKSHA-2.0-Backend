@@ -18,7 +18,7 @@ const router = Router();
  *     description: Authenticates user with Firebase token. Creates new user if doesn't exist.
  *     tags: [Auth]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Login successful
@@ -55,7 +55,7 @@ router.post('/login', verifyToken, loginOrRegister);
  *     description: Checks if a user with the Firebase UID exists in the database
  *     tags: [Auth]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: User check result
@@ -86,7 +86,7 @@ router.get('/check', verifyToken, checkUser);
  *     description: Returns the currently authenticated user's profile
  *     tags: [Auth]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Current user data
@@ -114,7 +114,7 @@ router.get('/me', authenticate, getMe);
  *     description: Logs out the current user (mainly for tracking purposes)
  *     tags: [Auth]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Logout successful
@@ -142,7 +142,7 @@ router.post('/logout', authenticate, logout);
  *     description: Permanently deletes the user's account from both database and Firebase
  *     tags: [Auth]
  *     security:
- *       - BearerAuth: []
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Account deleted successfully

@@ -19,7 +19,7 @@ const options = {
         ],
         components: {
             securitySchemes: {
-                BearerAuth: {
+                bearerAuth: {
                     type: 'http',
                     scheme: 'bearer',
                     bearerFormat: 'Firebase ID Token',
@@ -139,6 +139,84 @@ const options = {
                         description: { type: 'string', maxLength: 500 },
                         resolvedAt: { type: 'string', format: 'date-time' },
                         resolutionNotes: { type: 'string', maxLength: 500 },
+                        createdAt: { type: 'string', format: 'date-time' },
+                        updatedAt: { type: 'string', format: 'date-time' }
+                    }
+                },
+                Group: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+                        name: { type: 'string', example: 'Family Trip', maxLength: 100 },
+                        groupPictureURL: { type: 'string', format: 'uri', example: 'https://example.com/group-pic.jpg' },
+                        description: { type: 'string', example: 'Family vacation group', maxLength: 500 },
+                        createdBy: { type: 'string', example: '507f1f77bcf86cd799439012' },
+                        members: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/GroupMember' }
+                        },
+                        joinCode: { type: 'string', example: 'ABC123' },
+                        isActive: { type: 'boolean', default: true },
+                        memberCount: { type: 'integer', example: 5 },
+                        createdAt: { type: 'string', format: 'date-time' },
+                        updatedAt: { type: 'string', format: 'date-time' }
+                    }
+                },
+                GroupMember: {
+                    type: 'object',
+                    properties: {
+                        userID: { 
+                            oneOf: [
+                                { type: 'string', example: '507f1f77bcf86cd799439012' },
+                                { $ref: '#/components/schemas/User' }
+                            ]
+                        },
+                        role: { type: 'string', enum: ['admin', 'member'], default: 'member' },
+                        joinedAt: { type: 'string', format: 'date-time' }
+                    }
+                },
+                Geofence: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+                        name: { type: 'string', example: 'Mumbai Airport Safety Zone', maxLength: 100 },
+                        description: { type: 'string', example: 'Safe zone around Mumbai International Airport', maxLength: 500 },
+                        location: { $ref: '#/components/schemas/GeoPoint' },
+                        radius: { type: 'number', example: 5000, description: 'Radius in meters' },
+                        fenceType: { type: 'string', enum: ['safety', 'restricted'], example: 'safety' },
+                        isActive: { type: 'boolean', default: true },
+                        createdAt: { type: 'string', format: 'date-time' },
+                        updatedAt: { type: 'string', format: 'date-time' }
+                    }
+                },
+                Trip: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+                        userID: { type: 'string', example: '507f1f77bcf86cd799439012' },
+                        tripName: { type: 'string', example: 'Goa Beach Vacation', maxLength: 200 },
+                        startLocation: { $ref: '#/components/schemas/GeoPoint' },
+                        endLocation: { $ref: '#/components/schemas/GeoPoint' },
+                        startDate: { type: 'string', format: 'date-time', example: '2026-02-01T10:00:00Z' },
+                        endDate: { type: 'string', format: 'date-time', example: '2026-02-07T18:00:00Z' },
+                        status: { type: 'string', enum: ['planned', 'ongoing', 'completed', 'cancelled'], default: 'planned' },
+                        createdAt: { type: 'string', format: 'date-time' },
+                        updatedAt: { type: 'string', format: 'date-time' }
+                    }
+                },
+                SafetyScore: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+                        name: { type: 'string', example: 'Mumbai, Maharashtra', maxLength: 200 },
+                        location: { $ref: '#/components/schemas/GeoPoint' },
+                        population: { type: 'number', example: 12442373 },
+                        populationDensity: { type: 'number', example: 20680 },
+                        crimeRate: { type: 'number', example: 156.2 },
+                        safetyScore: { type: 'number', minimum: 0, maximum: 100, example: 65 },
+                        safetyRank: { type: 'number', example: 15 },
+                        riskLevel: { type: 'string', enum: ['Low Risk', 'Moderate Risk', 'Medium Risk', 'High Risk', 'Extreme Risk'], example: 'Moderate Risk' },
+                        lastUpdated: { type: 'string', format: 'date-time' },
                         createdAt: { type: 'string', format: 'date-time' },
                         updatedAt: { type: 'string', format: 'date-time' }
                     }

@@ -98,75 +98,93 @@ export const notFoundHandler = (req, res, next) => {
  * Global error handler middleware
  */
 export const errorHandler = (err, req, res, next) => {
+    // Prevent calling next() in error handler - just send response
+    if (res.headersSent) {
+        return;
+    }
+
     let error = err;
 
     // Log error for debugging
     if (process.env.NODE_ENV !== 'production') {
         console.error('Error:', {
-            message: err.message,
-            stack: err.stack,
-            path: req.path,
-            method: req.method
+            message: err?.message,
+            stack: err?.stack,
+            path: req?.path,
+            method: req?.method
         });
     }
 
-    // Handle Mongoose CastError (invalid ObjectId)
-    if (err.name === 'CastError') {
-        error = new BadRequestError(`Invalid ${err.path}: ${err.value}`);
-    }
+    try {
+        // Handle Mongoose CastError (invalid ObjectId)
+        if (err.name === 'CastError') {
+            error = new BadRequestError(`Invalid ${err.path}: ${err.value}`);
+        }
 
-    // Handle Mongoose Validation Error
-    if (err.name === 'ValidationError') {
-        const errors = Object.values(err.errors).map(e => ({
-            field: e.path,
-            message: e.message
-        }));
-        error = new ValidationError(errors, 'Validation failed');
-    }
+        // Handle Mongoose Validation Error
+        if (err.name === 'ValidationError' && err.errors) {
+            const errors = Object.values(err.errors).map(e => ({
+                field: e.path,
+                message: e.message
+            }));
+            error = new ValidationError(errors, 'Validation failed');
+        }
 
-    // Handle Mongoose Duplicate Key Error
-    if (err.code === 11000) {
-        const field = Object.keys(err.keyValue)[0];
-        error = new ConflictError(`${field} already exists`);
-    }
+        // Handle Mongoose Duplicate Key Error
+        if (err.code === 11000 && err.keyValue) {
+            const field = Object.keys(err.keyValue)[0];
+            error = new ConflictError(`${field} already exists`);
+        }
 
-    // Handle JWT Errors
-    if (err.name === 'JsonWebTokenError') {
-        error = new UnauthorizedError('Invalid token');
-    }
+        // Handle JWT Errors
+        if (err.name === 'JsonWebTokenError') {
+            error = new UnauthorizedError('Invalid token');
+        }
 
-    if (err.name === 'TokenExpiredError') {
-        error = new UnauthorizedError('Token expired');
-    }
+        if (err.name === 'TokenExpiredError') {
+            error = new UnauthorizedError('Token expired');
+        }
 
-    // Handle Firebase Auth Errors
-    if (err.code?.startsWith('auth/')) {
-        const firebaseErrors = {
-            'auth/id-token-expired': 'Token expired, please login again',
-            'auth/id-token-revoked': 'Token revoked, please login again',
-            'auth/invalid-id-token': 'Invalid token',
-            'auth/argument-error': 'Invalid token format',
-            'auth/user-not-found': 'User not found',
-            'auth/user-disabled': 'User account is disabled'
+        // Handle Firebase Auth Errors
+        if (err.code?.startsWith?.('auth/')) {
+            const firebaseErrors = {
+                'auth/id-token-expired': 'Token expired, please login again',
+                'auth/id-token-revoked': 'Token revoked, please login again',
+                'auth/invalid-id-token': 'Invalid token',
+                'auth/argument-error': 'Invalid token format',
+                'auth/user-not-found': 'User not found',
+                'auth/user-disabled': 'User account is disabled'
+            };
+            error = new UnauthorizedError(firebaseErrors[err.code] || 'Authentication failed');
+        }
+
+        // Default to ApiError or create one
+        if (!(error instanceof ApiError)) {
+            error = new ApiError(
+                error?.statusCode || 500,
+                error?.message || 'Internal server error'
+            );
+        }
+
+        // Send response
+        const response = {
+            success: false,
+            message: error.message,
+            ...(error.errors?.length > 0 && { errors: error.errors }),
+            ...(process.env.NODE_ENV !== 'production' && { stack: err?.stack })
         };
-        error = new UnauthorizedError(firebaseErrors[err.code] || 'Authentication failed');
+
+        res.status(error.statusCode).json(response);
+    } catch (handlerError) {
+        // Fallback if error handler itself fails
+        console.error('Error handler failed:', handlerError);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            ...(process.env.NODE_ENV !== 'production' && { 
+                originalError: err?.message,
+                handlerError: handlerError?.message 
+            })
+        });
     }
-
-    // Default to ApiError or create one
-    if (!(error instanceof ApiError)) {
-        error = new ApiError(
-            error.statusCode || 500,
-            error.message || 'Internal server error'
-        );
-    }
-
-    // Send response
-    const response = {
-        success: false,
-        message: error.message,
-        ...(error.errors.length > 0 && { errors: error.errors }),
-        ...(process.env.NODE_ENV !== 'production' && { stack: error.stack })
-    };
-
-    res.status(error.statusCode).json(response);
 };
