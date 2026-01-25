@@ -15,6 +15,10 @@ const options = {
             {
                 url: 'http://localhost:3000',
                 description: 'Development server'
+            },
+            {
+                url: 'http://98.70.26.155:3000',
+                description: 'Production server'
             }
         ],
         components: {
