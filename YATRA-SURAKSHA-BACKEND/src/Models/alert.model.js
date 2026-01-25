@@ -44,6 +44,17 @@ const alertSchema = new mongoose.Schema({
         default: 'SOS Alert Triggered by User',
         maxlength: 500
     },
+    // Geofence reference (for geofence-related alerts)
+    geofenceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Geofence',
+        required: false
+    },
+    geofenceName: {
+        type: String,
+        required: false,
+        maxlength: 200
+    },
     // Resolution details
     resolvedAt: {
         type: Date

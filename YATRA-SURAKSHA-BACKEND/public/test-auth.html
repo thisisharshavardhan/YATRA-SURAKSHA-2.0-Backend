@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yatra Suraksha - Get Test Token</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        input, button {
+            padding: 12px 16px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            margin: 5px 0;
+        }
+        input { width: 100%; }
+        button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover { background: #3367d6; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .token-box {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .copy-btn {
+            background: #28a745;
+            margin-top: 10px;
+        }
+        .info { 
+            background: #e7f3ff; 
+            border-left: 4px solid #4285f4;
+            padding: 10px 15px;
+            margin: 10px 0;
+        }
+        #status { margin: 10px 0; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <h1>🔐 Yatra Suraksha - Auth Token Generator</h1>
+    
+    <div class="card">
+        <h3>Option 1: Sign in with Email/Password</h3>
+        <input type="email" id="email" placeholder="Email" value="test@example.com">
+        <input type="password" id="password" placeholder="Password" value="test123456">
+        <button onclick="signInWithEmail()">Sign In</button>
+        <button onclick="signUpWithEmail()" style="background: #6c757d; margin-top: 5px;">Create Account</button>
+    </div>
+
+    <div class="card">
+        <h3>Option 2: Exchange Custom Token</h3>
+        <div class="info">
+            Run <code>node scripts/generate-test-token.js</code> to get a custom token
+        </div>
+        <textarea id="customToken" placeholder="Paste custom token here" rows="3" style="width: 100%; font-family: monospace; font-size: 12px;"></textarea>
+        <button onclick="exchangeCustomToken()">Exchange for ID Token</button>
+    </div>
+
+    <div class="card">
+        <h3>Option 3: Anonymous Sign In</h3>
+        <button onclick="signInAnonymously()">Sign In Anonymously</button>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="card" id="tokenCard" style="display: none;">
+        <h3 class="success">✅ Token Generated!</h3>
+        <p>Use this token in Swagger UI or API requests:</p>
+        <div class="token-box" id="tokenDisplay"></div>
+        <button class="copy-btn" onclick="copyToken()">📋 Copy Token</button>
+        <p style="margin-top: 15px;"><strong>User Info:</strong></p>
+        <pre id="userInfo" style="background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto;"></pre>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { 
+            getAuth, 
+            signInWithEmailAndPassword,
+            createUserWithEmailAndPassword,
+            signInAnonymously as firebaseSignInAnonymously,
+            signInWithCustomToken
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        // Firebase config from google-services.json
+        const firebaseConfig = {
+            apiKey: "AIzaSyCp4hkpLnW66GqEt1p_pwCcucSfQOJtaV4",
+            authDomain: "yatrasuraksha.firebaseapp.com",
+            projectId: "yatrasuraksha",
+            storageBucket: "yatrasuraksha.firebasestorage.app",
+            messagingSenderId: "998797238629",
+            appId: "1:998797238629:android:5d4e71608791aea8be818c"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        window.currentToken = null;
+
+        async function getAndDisplayToken(user) {
+            const token = await user.getIdToken();
+            window.currentToken = token;
+            
+            document.getElementById('tokenCard').style.display = 'block';
+            document.getElementById('tokenDisplay').textContent = token;
+            document.getElementById('userInfo').textContent = JSON.stringify({
+                uid: user.uid,
+                email: user.email,
+                isAnonymous: user.isAnonymous,
+                emailVerified: user.emailVerified
+            }, null, 2);
+            document.getElementById('status').innerHTML = '<span class="success">✅ Authentication successful!</span>';
+        }
+
+        window.signInWithEmail = async function() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            document.getElementById('status').textContent = 'Signing in...';
+            
+            try {
+                const result = await signInWithEmailAndPassword(auth, email, password);
+                await getAndDisplayToken(result.user);
+            } catch (error) {
+                document.getElementById('status').innerHTML = `<span class="error">❌ ${error.message}</span>`;
+            }
+        };
+
+        window.signUpWithEmail = async function() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            document.getElementById('status').textContent = 'Creating account...';
+            
+            try {
+                const result = await createUserWithEmailAndPassword(auth, email, password);
+                await getAndDisplayToken(result.user);
+            } catch (error) {
+                document.getElementById('status').innerHTML = `<span class="error">❌ ${error.message}</span>`;
+            }
+        };
+
+        window.signInAnonymously = async function() {
+            document.getElementById('status').textContent = 'Signing in anonymously...';
+            
+            try {
+                const result = await firebaseSignInAnonymously(auth);
+                await getAndDisplayToken(result.user);
+            } catch (error) {
+                document.getElementById('status').innerHTML = `<span class="error">❌ ${error.message}</span>`;
+            }
+        };
+
+        window.exchangeCustomToken = async function() {
+            const customToken = document.getElementById('customToken').value.trim();
+            if (!customToken) {
+                document.getElementById('status').innerHTML = '<span class="error">❌ Please paste a custom token</span>';
+                return;
+            }
+            document.getElementById('status').textContent = 'Exchanging token...';
+            
+            try {
+                const result = await signInWithCustomToken(auth, customToken);
+                await getAndDisplayToken(result.user);
+            } catch (error) {
+                document.getElementById('status').innerHTML = `<span class="error">❌ ${error.message}</span>`;
+            }
+        };
+
+        window.copyToken = function() {
+            if (window.currentToken) {
+                navigator.clipboard.writeText(window.currentToken);
+                document.querySelector('.copy-btn').textContent = '✅ Copied!';
+                setTimeout(() => {
+                    document.querySelector('.copy-btn').textContent = '📋 Copy Token';
+                }, 2000);
+            }
+        };
+    </script>
+</body>
+</html>
