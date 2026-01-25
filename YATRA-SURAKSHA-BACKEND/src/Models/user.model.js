@@ -12,7 +12,8 @@ const userSchema = new mongoose.Schema({
             return this.providers.includes('firebase');
         },
         unique: true,
-        sparse: true
+        sparse: true,
+        trim: true
     },
     clerkID: {
         type: String,
@@ -20,22 +21,28 @@ const userSchema = new mongoose.Schema({
             return this.providers.includes('clerk');
         },
         unique: true,
-        sparse: true
+        sparse: true,
+        trim: true
     },
     name: {
         type: String,
-        required: true
+        required: true,
+        trim: true,
+        maxlength: 100
     },
     email: {
         type: String,
         required: true,
-        unique: true
+        unique: true,
+        trim: true,
+        lowercase: true,
+        match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
     },
     phoneNumber: {
         type: String,
         required: false
     },
-    alteratePhoneNumber: {
+    alternativePhoneNumber: {
         type: String,
         required: false
     },
@@ -89,13 +96,33 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ['male', 'female', 'other'],
         required: false
+    },
+    permissions: {
+        type: {
+            allowLocationAccess: { type: Boolean, default: true },
+            allowNotificationAccess: { type: Boolean, default: true },
+            allowSmsAccess: { type: Boolean, default: false }
+        }
     }
-}, { timestamps: true });
+}, { 
+    timestamps: true,
+    collection: 'users',
+    toJSON: {
+        virtuals: true,
+        transform: function(doc, ret) {
+            ret.id = ret._id;
+            delete ret._id;
+            delete ret.__v;
+            return ret;
+        }
+    },
+    toObject: { virtuals: true }
+});
 
-userSchema.index({ firebaseUID: 1 });
-userSchema.index({ clerkID: 1 });
-userSchema.index({ email: 1 });
-userSchema.index({ phoneNumber: 1 });
+// Only add indexes for fields not already marked unique (unique creates index)
+userSchema.index({ phoneNumber: 1 }, { sparse: true });
 userSchema.index({ role: 1 });
+userSchema.index({ isVerified: 1 });
+userSchema.index({ createdAt: -1 });
 
 export default mongoose.model('User', userSchema);
