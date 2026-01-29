@@ -9,6 +9,9 @@
 .env.development
 .env.test
 .env.production
+
+# Test files with hardcoded credentials
+public/gpt-realtime.html
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

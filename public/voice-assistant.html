@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yatra Suraksha - AI Voice Assistant</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #aaa;
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .auth-section {
+            margin-bottom: 20px;
+        }
+
+        .auth-section label {
+            display: block;
+            margin-bottom: 8px;
+            color: #e94560;
+            font-weight: 600;
+        }
+
+        .auth-section input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 1rem;
+            margin-bottom: 15px;
+        }
+
+        .auth-section input::placeholder {
+            color: #888;
+        }
+
+        .status-panel {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #666;
+            transition: all 0.3s ease;
+        }
+
+        .status-indicator.connected {
+            background: #4CAF50;
+            box-shadow: 0 0 10px #4CAF5080;
+        }
+
+        .status-indicator.recording {
+            background: #f44336;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336 0%, #e91e63 100%);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .voice-button-container {
+            display: flex;
+            justify-content: center;
+            margin: 40px 0;
+        }
+
+        .voice-button {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 40px rgba(233, 69, 96, 0.4);
+        }
+
+        .voice-button:hover {
+            transform: scale(1.05);
+        }
+
+        .voice-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .voice-button.recording {
+            background: linear-gradient(135deg, #f44336 0%, #e91e63 100%);
+            animation: recording-pulse 1s infinite;
+        }
+
+        @keyframes recording-pulse {
+            0%, 100% { box-shadow: 0 10px 40px rgba(244, 67, 54, 0.4); }
+            50% { box-shadow: 0 10px 60px rgba(244, 67, 54, 0.6); }
+        }
+
+        .voice-button svg {
+            width: 60px;
+            height: 60px;
+            fill: white;
+        }
+
+        .context-panel {
+            background: rgba(233, 69, 96, 0.1);
+            border-left: 4px solid #e94560;
+            padding: 20px;
+            border-radius: 0 10px 10px 0;
+            margin-bottom: 20px;
+        }
+
+        .context-panel h3 {
+            color: #e94560;
+            margin-bottom: 15px;
+        }
+
+        .context-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .context-item:last-child {
+            border-bottom: none;
+        }
+
+        .context-label {
+            color: #aaa;
+        }
+
+        .context-value {
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .safety-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .safety-badge.low { background: #4CAF50; }
+        .safety-badge.moderate { background: #ff9800; }
+        .safety-badge.high { background: #f44336; }
+
+        .conversation {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+        }
+
+        .message {
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            border-radius: 15px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            margin-left: 50px;
+            text-align: right;
+        }
+
+        .message.assistant {
+            background: rgba(255, 255, 255, 0.1);
+            margin-right: 50px;
+        }
+
+        .message.system {
+            background: rgba(255, 152, 0, 0.2);
+            text-align: center;
+            font-style: italic;
+            color: #ff9800;
+        }
+
+        .message-label {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .audio-visualizer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            height: 60px;
+            margin: 20px 0;
+        }
+
+        .visualizer-bar {
+            width: 6px;
+            height: 20px;
+            background: linear-gradient(180deg, #e94560 0%, #ff6b6b 100%);
+            border-radius: 3px;
+            transition: height 0.1s ease;
+        }
+
+        .error-message {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .text-input-section {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .text-input-section input {
+            flex: 1;
+            padding: 14px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 1rem;
+        }
+
+        .text-input-section button {
+            padding: 14px 24px;
+            border-radius: 25px;
+        }
+
+        .location-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .location-section input {
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .conversation::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .conversation::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        .conversation::-webkit-scrollbar-thumb {
+            background: rgba(233, 69, 96, 0.5);
+            border-radius: 4px;
+        }
+
+        /* Settings Panel Styles */
+        .settings-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .setting-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .setting-item label {
+            display: block;
+            color: #e94560;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .setting-item select,
+        .setting-item input[type="range"] {
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 0.9rem;
+        }
+
+        .setting-item select {
+            cursor: pointer;
+        }
+
+        .setting-item select option {
+            background: #1a1a2e;
+            color: #fff;
+        }
+
+        .setting-item input[type="range"] {
+            -webkit-appearance: none;
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .setting-item input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            cursor: pointer;
+        }
+
+        .setting-value {
+            display: inline-block;
+            background: #e94560;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            margin-left: 10px;
+        }
+
+        .setting-hint {
+            display: block;
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .voice-preview {
+            background: rgba(233, 69, 96, 0.1);
+            border-left: 3px solid #e94560;
+            padding: 15px;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .voice-preview ul {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0 0 0;
+        }
+
+        .voice-preview li {
+            padding: 5px 0;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ Yatra Suraksha AI Assistant</h1>
+            <p>Your Personal Travel Safety Companion</p>
+        </div>
+
+        <div class="card">
+            <div class="auth-section">
+                <label>Firebase Auth Token</label>
+                <input type="text" id="authToken" placeholder="Paste your Firebase Auth Token here...">
+                
+                <label>Location (Optional)</label>
+                <div class="location-section">
+                    <input type="number" id="longitude" placeholder="Longitude (e.g., 77.17)" step="any">
+                    <input type="number" id="latitude" placeholder="Latitude (e.g., 28.65)" step="any">
+                </div>
+            </div>
+
+            <!-- Voice & Settings Experimentation Panel -->
+            <div class="settings-panel">
+                <h3 style="color: #e94560; margin-bottom: 15px;">🎛️ Voice & Speed Settings (Experimental)</h3>
+                
+                <div class="settings-grid">
+                    <div class="setting-item">
+                        <label>Voice Style</label>
+                        <select id="voiceSelect">
+                            <option value="shimmer" selected>Shimmer - Warm, Expressive ✨</option>
+                            <option value="alloy">Alloy - Neutral, Balanced</option>
+                            <option value="echo">Echo - Soft, Gentle</option>
+                            <option value="ash">Ash - Clear, Professional</option>
+                            <option value="ballad">Ballad - Melodic, Soothing</option>
+                            <option value="coral">Coral - Warm, Friendly</option>
+                            <option value="sage">Sage - Calm, Wise</option>
+                            <option value="verse">Verse - Dynamic, Engaging</option>
+                            <option value="marin">Marin - Fresh, Energetic 🆕</option>
+                            <option value="cedar">Cedar - Deep, Grounded 🆕</option>
+                        </select>
+                        <span class="setting-hint">Each voice has unique personality</span>
+                    </div>
+
+                    <div class="setting-item">
+                        <label>Temperature</label>
+                        <input type="range" id="temperatureSlider" min="0.1" max="1.2" step="0.1" value="0.7">
+                        <span class="setting-value" id="temperatureValue">0.7</span>
+                        <span class="setting-hint">Lower = focused, Higher = creative</span>
+                    </div>
+
+                    <div class="setting-item">
+                        <label>Silence Duration (ms)</label>
+                        <input type="range" id="silenceSlider" min="200" max="1000" step="50" value="300">
+                        <span class="setting-value" id="silenceValue">300ms</span>
+                        <span class="setting-hint">How long to wait before responding</span>
+                    </div>
+
+                    <div class="setting-item">
+                        <label>VAD Threshold</label>
+                        <input type="range" id="vadSlider" min="0.1" max="0.9" step="0.1" value="0.4">
+                        <span class="setting-value" id="vadValue">0.4</span>
+                        <span class="setting-hint">Speech detection sensitivity</span>
+                    </div>
+
+                    <div class="setting-item">
+                        <label>Max Response Tokens</label>
+                        <input type="range" id="maxTokensSlider" min="256" max="2048" step="128" value="1024">
+                        <span class="setting-value" id="maxTokensValue">1024</span>
+                        <span class="setting-hint">Higher = longer responses (avoid cutoffs)</span>
+                    </div>
+                </div>
+
+                <div class="voice-preview">
+                    <p><strong>Voice Characteristics:</strong></p>
+                    <ul id="voiceDescription">
+                        <li><strong>Shimmer:</strong> Warm and expressive, good for empathetic interactions</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div id="errorMessage" class="error-message"></div>
+
+            <div class="status-panel">
+                <div class="status-item">
+                    <div id="socketStatus" class="status-indicator"></div>
+                    <span id="socketText">Socket Disconnected</span>
+                </div>
+                <div class="status-item">
+                    <div id="gptStatus" class="status-indicator"></div>
+                    <span id="gptText">AI Disconnected</span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="connectSocketBtn" class="btn btn-success" onclick="connectSocket()">Connect Socket</button>
+                <button id="connectGptBtn" class="btn btn-primary" onclick="connectGpt()" disabled>Connect AI</button>
+                <button id="disconnectBtn" class="btn btn-danger" onclick="disconnect()" disabled>Disconnect</button>
+            </div>
+        </div>
+
+        <div class="card" id="contextCard" style="display: none;">
+            <div class="context-panel">
+                <h3>📍 Context Information</h3>
+                <div id="contextInfo">
+                    <div class="context-item">
+                        <span class="context-label">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="voiceCard" style="display: none;">
+            <h2 style="text-align: center; margin-bottom: 20px; color: #e94560;">🎙️ Voice Assistant</h2>
+            
+            <div class="audio-visualizer" id="visualizer"></div>
+
+            <div class="voice-button-container">
+                <button id="voiceBtn" class="voice-button" disabled 
+                    onmousedown="startRecording()" onmouseup="stopRecording()"
+                    ontouchstart="startRecording()" ontouchend="stopRecording()">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                    </svg>
+                </button>
+            </div>
+
+            <p style="text-align: center; color: #888; margin-bottom: 20px;">Hold to speak, release to send</p>
+
+            <div class="text-input-section">
+                <input type="text" id="textInput" placeholder="Or type your message..." onkeypress="handleTextKeypress(event)">
+                <button class="btn btn-primary" onclick="sendText()">Send</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-bottom: 20px; color: #e94560;">💬 Conversation</h2>
+            <div class="conversation" id="conversation">
+                <div class="message system">
+                    Enter your auth token and connect to start...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let isRecording = false;
+        let audioContext = null;
+        let microphone = null;
+
+        // DOM Elements
+        const authToken = document.getElementById('authToken');
+        const longitude = document.getElementById('longitude');
+        const latitude = document.getElementById('latitude');
+        const socketStatus = document.getElementById('socketStatus');
+        const socketText = document.getElementById('socketText');
+        const gptStatus = document.getElementById('gptStatus');
+        const gptText = document.getElementById('gptText');
+        const connectSocketBtn = document.getElementById('connectSocketBtn');
+        const connectGptBtn = document.getElementById('connectGptBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const voiceBtn = document.getElementById('voiceBtn');
+        const conversation = document.getElementById('conversation');
+        const contextCard = document.getElementById('contextCard');
+        const voiceCard = document.getElementById('voiceCard');
+        const contextInfo = document.getElementById('contextInfo');
+        const visualizer = document.getElementById('visualizer');
+        const errorMessage = document.getElementById('errorMessage');
+        const textInput = document.getElementById('textInput');
+
+        // Initialize visualizer
+        function initVisualizer() {
+            visualizer.innerHTML = '';
+            for (let i = 0; i < 30; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'visualizer-bar';
+                visualizer.appendChild(bar);
+            }
+        }
+        initVisualizer();
+
+        // Voice descriptions for the preview
+        const voiceDescriptions = {
+            shimmer: '<li><strong>Shimmer:</strong> Warm and expressive, good for empathetic interactions. Has a gentle, caring tone perfect for a safety assistant.</li>',
+            alloy: '<li><strong>Alloy:</strong> Neutral and balanced. Professional sound that works well for informational content.</li>',
+            echo: '<li><strong>Echo:</strong> Soft and gentle. Calm voice that\'s soothing in stressful situations.</li>',
+            ash: '<li><strong>Ash:</strong> Clear and professional. Confident tone that conveys reliability and trustworthiness.</li>',
+            ballad: '<li><strong>Ballad:</strong> Melodic and soothing. Smooth, flowing speech that\'s pleasant to listen to.</li>',
+            coral: '<li><strong>Coral:</strong> Warm and friendly. Approachable personality, great for casual conversations.</li>',
+            sage: '<li><strong>Sage:</strong> Calm and wise. Measured pace that inspires confidence and trust.</li>',
+            verse: '<li><strong>Verse:</strong> Dynamic and engaging. Expressive with good emotional range for varied situations.</li>',
+            marin: '<li><strong>Marin:</strong> Fresh and energetic. Youthful, upbeat voice with natural enthusiasm. 🆕</li>',
+            cedar: '<li><strong>Cedar:</strong> Deep and grounded. Authoritative but warm, good for urgent but reassuring messages. 🆕</li>'
+        };
+
+        // Settings elements
+        const voiceSelect = document.getElementById('voiceSelect');
+        const temperatureSlider = document.getElementById('temperatureSlider');
+        const silenceSlider = document.getElementById('silenceSlider');
+        const vadSlider = document.getElementById('vadSlider');
+        const maxTokensSlider = document.getElementById('maxTokensSlider');
+
+        // Update voice description
+        voiceSelect.addEventListener('change', () => {
+            document.getElementById('voiceDescription').innerHTML = voiceDescriptions[voiceSelect.value];
+        });
+
+        // Update slider display values
+        temperatureSlider.addEventListener('input', () => {
+            document.getElementById('temperatureValue').textContent = temperatureSlider.value;
+        });
+
+        silenceSlider.addEventListener('input', () => {
+            document.getElementById('silenceValue').textContent = silenceSlider.value + 'ms';
+        });
+
+        vadSlider.addEventListener('input', () => {
+            document.getElementById('vadValue').textContent = vadSlider.value;
+        });
+
+        maxTokensSlider.addEventListener('input', () => {
+            document.getElementById('maxTokensValue').textContent = maxTokensSlider.value;
+        });
+
+        // Get current settings
+        function getVoiceSettings() {
+            return {
+                voice: voiceSelect.value,
+                temperature: parseFloat(temperatureSlider.value),
+                silence_duration_ms: parseInt(silenceSlider.value),
+                vad_threshold: parseFloat(vadSlider.value),
+                max_tokens: parseInt(maxTokensSlider.value)
+            };
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(() => errorMessage.style.display = 'none', 5000);
+        }
+
+        function addMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + role;
+
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'message-label';
+            labelDiv.textContent = role === 'user' ? 'You' : role === 'assistant' ? 'AI Assistant' : 'System';
+
+            messageDiv.appendChild(labelDiv);
+            messageDiv.appendChild(document.createTextNode(content));
+
+            conversation.appendChild(messageDiv);
+            conversation.scrollTop = conversation.scrollHeight;
+        }
+
+        function updateContext(data) {
+            let html = '';
+            
+            if (data.user) {
+                html += `<div class="context-item">
+                    <span class="context-label">User</span>
+                    <span class="context-value">${data.user.name}</span>
+                </div>`;
+            }
+
+            if (data.location) {
+                html += `<div class="context-item">
+                    <span class="context-label">Location</span>
+                    <span class="context-value">${data.location.latitude?.toFixed(4)}, ${data.location.longitude?.toFixed(4)}</span>
+                </div>`;
+            }
+
+            if (data.safetyInfo) {
+                const riskClass = data.safetyInfo.riskLevel.toLowerCase().includes('low') ? 'low' : 
+                                  data.safetyInfo.riskLevel.toLowerCase().includes('high') ? 'high' : 'moderate';
+                html += `<div class="context-item">
+                    <span class="context-label">Area</span>
+                    <span class="context-value">${data.safetyInfo.name}</span>
+                </div>
+                <div class="context-item">
+                    <span class="context-label">Safety Score</span>
+                    <span class="context-value">${data.safetyInfo.safetyScore}/100</span>
+                </div>
+                <div class="context-item">
+                    <span class="context-label">Risk Level</span>
+                    <span class="safety-badge ${riskClass}">${data.safetyInfo.riskLevel}</span>
+                </div>`;
+            }
+
+            contextInfo.innerHTML = html || '<div class="context-item"><span class="context-label">No context available</span></div>';
+        }
+
+        // Connect to Socket.IO
+        function connectSocket() {
+            const token = authToken.value.trim();
+            if (!token) {
+                showError('Please enter your auth token');
+                return;
+            }
+
+            addMessage('system', 'Connecting to server...');
+
+            socket = io('/user', {
+                auth: { token },
+                transports: ['websocket', 'polling']
+            });
+
+            socket.on('connect', () => {
+                socketStatus.classList.add('connected');
+                socketText.textContent = 'Socket Connected';
+                connectSocketBtn.disabled = true;
+                connectGptBtn.disabled = false;
+                disconnectBtn.disabled = false;
+                addMessage('system', 'Connected to Yatra Suraksha server!');
+            });
+
+            socket.on('connected', (data) => {
+                console.log('User connected:', data);
+            });
+
+            socket.on('connect_error', (error) => {
+                console.error('Connection error:', error);
+                showError('Connection failed: ' + error.message);
+                socketStatus.classList.remove('connected');
+                socketText.textContent = 'Connection Failed';
+            });
+
+            // GPT Events
+            socket.on('gpt:connected', (data) => {
+                gptStatus.classList.add('connected');
+                gptText.textContent = 'AI Connected';
+                voiceBtn.disabled = false;
+                voiceCard.style.display = 'block';
+                contextCard.style.display = 'block';
+                addMessage('system', 'AI Assistant ready! Hold the mic button to speak.');
+                fetchContext();
+            });
+
+            socket.on('gpt:session-created', (data) => {
+                console.log('Session created:', data);
+            });
+
+            socket.on('gpt:audio-delta', (data) => {
+                playAudioDelta(data.audio);
+            });
+
+            socket.on('gpt:audio-done', () => {
+                console.log('Audio response complete');
+            });
+
+            socket.on('gpt:transcript-done', (data) => {
+                if (data.transcript) {
+                    addMessage('assistant', data.transcript);
+                }
+            });
+
+            socket.on('gpt:text-response', (data) => {
+                if (data.text) {
+                    addMessage('assistant', data.text);
+                }
+            });
+
+            socket.on('gpt:user-transcript', (data) => {
+                if (data.transcript) {
+                    addMessage('user', data.transcript);
+                }
+            });
+
+            socket.on('gpt:speech-started', () => {
+                gptText.textContent = 'Listening...';
+            });
+
+            socket.on('gpt:speech-stopped', () => {
+                gptText.textContent = 'Processing...';
+            });
+
+            socket.on('gpt:location-updated', (data) => {
+                if (data.safetyInfo) {
+                    updateContext({ safetyInfo: data.safetyInfo, location: data.location });
+                }
+            });
+
+            socket.on('gpt:error', (data) => {
+                showError(data.message);
+                console.error('GPT Error:', data);
+            });
+
+            socket.on('gpt:disconnected', () => {
+                gptStatus.classList.remove('connected');
+                gptText.textContent = 'AI Disconnected';
+                voiceBtn.disabled = true;
+            });
+
+            socket.on('disconnect', (reason) => {
+                socketStatus.classList.remove('connected');
+                gptStatus.classList.remove('connected');
+                socketText.textContent = 'Disconnected';
+                gptText.textContent = 'AI Disconnected';
+                connectSocketBtn.disabled = false;
+                connectGptBtn.disabled = true;
+                disconnectBtn.disabled = true;
+                voiceBtn.disabled = true;
+                addMessage('system', 'Disconnected: ' + reason);
+            });
+        }
+
+        // Connect to GPT Realtime
+        function connectGpt() {
+            const lng = parseFloat(longitude.value) || null;
+            const lat = parseFloat(latitude.value) || null;
+
+            const payload = {
+                // Include voice settings for experimentation
+                settings: getVoiceSettings()
+            };
+            
+            if (lng && lat) {
+                payload.longitude = lng;
+                payload.latitude = lat;
+            }
+
+            const settings = getVoiceSettings();
+            addMessage('system', `Connecting to AI with voice: ${settings.voice}, temp: ${settings.temperature}...`);
+            socket.emit('gpt:connect', payload);
+        }
+
+        // Fetch context via REST API
+        async function fetchContext() {
+            try {
+                const response = await fetch('/api/voice-assistant/context', {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken.value.trim()
+                    }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    updateContext(data.data);
+                }
+            } catch (error) {
+                console.error('Error fetching context:', error);
+            }
+        }
+
+        // Disconnect
+        function disconnect() {
+            if (socket) {
+                socket.emit('gpt:disconnect');
+                socket.disconnect();
+                socket = null;
+            }
+            stopRecording();
+        }
+
+        // Audio playback
+        let audioQueue = [];
+        let isPlaying = false;
+        let playbackContext = null;
+
+        function playAudioDelta(base64Audio) {
+            if (!base64Audio) return;
+
+            try {
+                const binaryString = atob(base64Audio);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                audioQueue.push(bytes);
+                if (!isPlaying) playNextAudio();
+            } catch (e) {
+                console.error('Error processing audio:', e);
+            }
+        }
+
+        async function playNextAudio() {
+            if (audioQueue.length === 0) {
+                isPlaying = false;
+                return;
+            }
+
+            isPlaying = true;
+
+            if (!playbackContext) {
+                playbackContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+            }
+
+            let totalLength = 0;
+            audioQueue.forEach(chunk => totalLength += chunk.length);
+
+            const combined = new Uint8Array(totalLength);
+            let offset = 0;
+            while (audioQueue.length > 0) {
+                const chunk = audioQueue.shift();
+                combined.set(chunk, offset);
+                offset += chunk.length;
+            }
+
+            const samples = new Int16Array(combined.buffer);
+            const float32 = new Float32Array(samples.length);
+            for (let i = 0; i < samples.length; i++) {
+                float32[i] = samples[i] / 32768;
+            }
+
+            const audioBuffer = playbackContext.createBuffer(1, float32.length, 24000);
+            audioBuffer.getChannelData(0).set(float32);
+
+            const source = playbackContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(playbackContext.destination);
+            source.onended = () => setTimeout(playNextAudio, 50);
+            source.start();
+        }
+
+        // Recording
+        async function startRecording() {
+            if (!socket || voiceBtn.disabled) return;
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: { channelCount: 1, sampleRate: 24000, echoCancellation: true, noiseSuppression: true }
+                });
+
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+                microphone = audioContext.createMediaStreamSource(stream);
+
+                const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+                processor.onaudioprocess = (e) => {
+                    if (!isRecording) return;
+
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    const int16Data = new Int16Array(inputData.length);
+                    for (let i = 0; i < inputData.length; i++) {
+                        int16Data[i] = Math.max(-32768, Math.min(32767, Math.round(inputData[i] * 32767)));
+                    }
+
+                    const uint8Data = new Uint8Array(int16Data.buffer);
+                    let binary = '';
+                    for (let i = 0; i < uint8Data.length; i++) {
+                        binary += String.fromCharCode(uint8Data[i]);
+                    }
+                    const base64 = btoa(binary);
+
+                    socket.emit('gpt:audio', { audio: base64 });
+                    updateVisualizerFromData(inputData);
+                };
+
+                microphone.connect(processor);
+                processor.connect(audioContext.destination);
+
+                isRecording = true;
+                voiceBtn.classList.add('recording');
+                gptText.textContent = 'Recording...';
+
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                showError('Could not access microphone.');
+            }
+        }
+
+        function stopRecording() {
+            if (isRecording) {
+                isRecording = false;
+                voiceBtn.classList.remove('recording');
+
+                socket.emit('gpt:audio-commit');
+
+                if (audioContext) {
+                    audioContext.close();
+                    audioContext = null;
+                }
+
+                gptText.textContent = 'AI Connected';
+                resetVisualizer();
+            }
+        }
+
+        function sendText() {
+            const text = textInput.value.trim();
+            if (!text || !socket) return;
+
+            socket.emit('gpt:text', { text });
+            addMessage('user', text);
+            textInput.value = '';
+        }
+
+        function handleTextKeypress(event) {
+            if (event.key === 'Enter') {
+                sendText();
+            }
+        }
+
+        function updateVisualizerFromData(data) {
+            const bars = visualizer.querySelectorAll('.visualizer-bar');
+            const step = Math.floor(data.length / bars.length);
+
+            bars.forEach((bar, i) => {
+                const start = i * step;
+                let sum = 0;
+                for (let j = 0; j < step; j++) {
+                    sum += Math.abs(data[start + j] || 0);
+                }
+                const avg = sum / step;
+                const height = Math.max(5, Math.min(50, avg * 200));
+                bar.style.height = height + 'px';
+            });
+        }
+
+        function resetVisualizer() {
+            const bars = visualizer.querySelectorAll('.visualizer-bar');
+            bars.forEach(bar => bar.style.height = '20px');
+        }
+
+        window.addEventListener('beforeunload', disconnect);
+    </script>
+</body>
+
+</html>

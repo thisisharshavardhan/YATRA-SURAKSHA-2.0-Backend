@@ -22,6 +22,7 @@ import groupRoutes from './Routes/group.routes.js';
 import geofenceRoutes from './Routes/geofence.routes.js';
 import tripRoutes from './Routes/trip.routes.js';
 import safetyScoreRoutes from './Routes/safetyScore.routes.js';
+import voiceAssistantRoutes from './Routes/voiceAssistant.routes.js';
 
 // Initialize Firebase
 import './Configs/firebase.config.js';
@@ -67,6 +68,7 @@ app.get('/', (req, res) => {
         endpoints: {
             restApi: '/api-docs',
             socketDocs: '/socket-docs',
+            voiceAssistant: '/voice-assistant',
             userSocket: 'ws://localhost:' + PORT + '/user',
             adminSocket: 'ws://localhost:' + PORT + '/admin'
         },
@@ -81,6 +83,11 @@ app.get('/socket-docs', (req, res) => {
     res.sendFile(join(__dirname, '../public/socket-docs.html'));
 });
 
+// Voice Assistant Demo Page
+app.get('/voice-assistant', (req, res) => {
+    res.sendFile(join(__dirname, '../public/voice-assistant.html'));
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -90,6 +97,7 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/geofences', geofenceRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/safety-scores', safetyScoreRoutes);
+app.use('/api/voice-assistant', voiceAssistantRoutes);
 
 // 404 handler
 app.use(notFoundHandler);
@@ -105,6 +113,7 @@ connectDB().then(() => {
         console.log(`Server running on port ${PORT}`);
         console.log(`REST API Docs: http://localhost:${PORT}/api-docs`);
         console.log(`Socket.IO Docs: http://localhost:${PORT}/socket-docs`);
+        console.log(`Voice Assistant: http://localhost:${PORT}/voice-assistant`);
         console.log(`User Socket: ws://localhost:${PORT}/user`);
         console.log(`Admin Socket: ws://localhost:${PORT}/admin`);
     });

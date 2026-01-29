@@ -3,6 +3,7 @@ import { socketAuth, adminSocketAuth } from './utils/socketAuth.js';
 import locationHandler from './handlers/location.handler.js';
 import sosHandler from './handlers/sos.handler.js';
 import adminHandler from './handlers/admin.handler.js';
+import gptRealtimeHandler from './handlers/gptRealtime.handler.js';
 import Group from '../Models/group.model.js';
 
 // Store online users
@@ -61,6 +62,7 @@ export function initializeSocket(httpServer) {
         // Register handlers
         locationHandler(io, socket, userNamespace, adminNamespace, onlineUsers);
         sosHandler(io, socket, userNamespace, adminNamespace);
+        gptRealtimeHandler(io, socket, userNamespace, adminNamespace);
 
         // Handle group refresh (call this after joining a group via REST API)
         socket.on('group:refresh', async () => {
