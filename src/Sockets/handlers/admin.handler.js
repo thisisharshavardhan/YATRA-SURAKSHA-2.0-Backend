@@ -6,6 +6,8 @@ import User from '../../Models/user.model.js';
 import Alert from '../../Models/alert.model.js';
 import Group from '../../Models/group.model.js';
 import Video from '../../Models/video.model.js';
+import SafetyScore from '../../Models/safetyScore.model.js';
+import Geofence from '../../Models/geofence.model.js';
 
 /**
  * Admin handler for dashboard real-time monitoring
@@ -1037,4 +1039,843 @@ export default function adminHandler(io, socket, userNamespace, onlineUsers) {
             });
         }
     });
+
+    // ==================== SAFETY SCORE EVENTS ====================
+
+    /**
+     * EVENT: admin:get-all-safety-scores
+     * Get all safety scores with optional filters and pagination
+     * 
+     * Payload:
+     * {
+     *   page: number (optional, default 1),
+     *   limit: number (optional, default 50, max 500),
+     *   riskLevel: string (optional) - 'Low Risk', 'Moderate Risk', 'Medium Risk', 'High Risk', 'Extreme Risk',
+     *   sortBy: string (optional) - 'safetyScore', 'name', 'crimeRate', 'population',
+     *   order: string (optional) - 'asc' or 'desc',
+     *   search: string (optional) - search by name
+     * }
+     * 
+     * Response Event: admin:all-safety-scores
+     */
+    socket.on('admin:get-all-safety-scores', async (data = {}) => {
+        try {
+            const {
+                page = 1,
+                limit = 50,
+                riskLevel,
+                sortBy = 'safetyScore',
+                order = 'desc',
+                search
+            } = data;
+
+            const query = {};
+            
+            if (riskLevel) {
+                query.riskLevel = riskLevel;
+            }
+            
+            if (search) {
+                query.name = { $regex: search, $options: 'i' };
+            }
+
+            const skip = (parseInt(page) - 1) * parseInt(limit);
+            const sortOrder = order === 'asc' ? 1 : -1;
+            const validSortFields = ['safetyScore', 'name', 'crimeRate', 'population', 'populationDensity', 'safetyRank'];
+            const sortField = validSortFields.includes(sortBy) ? sortBy : 'safetyScore';
+
+            const [scores, total] = await Promise.all([
+                SafetyScore.find(query)
+                    .sort({ [sortField]: sortOrder })
+                    .skip(skip)
+                    .limit(Math.min(parseInt(limit), 500))
+                    .lean(),
+                SafetyScore.countDocuments(query)
+            ]);
+
+            const formattedScores = scores.map(score => ({
+                id: score._id.toString(),
+                name: score.name,
+                latitude: score.location.coordinates[1],
+                longitude: score.location.coordinates[0],
+                population: score.population,
+                populationDensity: score.populationDensity,
+                crimeRate: score.crimeRate,
+                safetyScore: score.safetyScore,
+                safetyRank: score.safetyRank,
+                riskLevel: score.riskLevel,
+                lastUpdated: score.lastUpdated,
+                createdAt: score.createdAt
+            }));
+
+            socket.emit('admin:all-safety-scores', {
+                scores: formattedScores,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    total,
+                    pages: Math.ceil(total / parseInt(limit))
+                },
+                filters: { riskLevel, search }
+            });
+
+        } catch (error) {
+            console.error('Admin get all safety scores error:', error);
+            socket.emit('error', {
+                event: 'admin:get-all-safety-scores',
+                message: 'Failed to get safety scores'
+            });
+        }
+    });
+
+    /**
+     * EVENT: admin:get-safety-score
+     * Get a specific safety score by ID
+     * 
+     * Payload:
+     * {
+     *   scoreId: string (required)
+     * }
+     * 
+     * Response Event: admin:safety-score-details
+     */
+    socket.on('admin:get-safety-score', async (data) => {
+        try {
+            const { scoreId } = data;
+
+            if (!scoreId || !mongoose.Types.ObjectId.isValid(scoreId)) {
+                socket.emit('error', {
+                    event: 'admin:get-safety-score',
+                    message: 'Valid scoreId is required'
+                });
+                return;
+            }
+
+            const score = await SafetyScore.findById(scoreId).lean();
+
+            if (!score) {
+                socket.emit('error', {
+                    event: 'admin:get-safety-score',
+                    message: 'Safety score not found'
+                });
+                return;
+            }
+
+            socket.emit('admin:safety-score-details', {
+                id: score._id.toString(),
+                name: score.name,
+                latitude: score.location.coordinates[1],
+                longitude: score.location.coordinates[0],
+                population: score.population,
+                populationDensity: score.populationDensity,
+                crimeRate: score.crimeRate,
+                safetyScore: score.safetyScore,
+                safetyRank: score.safetyRank,
+                riskLevel: score.riskLevel,
+                lastUpdated: score.lastUpdated,
+                createdAt: score.createdAt,
+                updatedAt: score.updatedAt
+            });
+
+        } catch (error) {
+            console.error('Admin get safety score error:', error);
+            socket.emit('error', {
+                event: 'admin:get-safety-score',
+                message: 'Failed to get safety score'
+            });
+        }
+    });
+
+    /**
+     * EVENT: admin:get-nearby-safety-scores
+     * Get safety scores near a location
+     * 
+     * Payload:
+     * {
+     *   latitude: number (required),
+     *   longitude: number (required),
+     *   radiusKm: number (optional, default 50, max 500)
+     * }
+     * 
+     * Response Event: admin:nearby-safety-scores
+     */
+    socket.on('admin:get-nearby-safety-scores', async (data) => {
+        try {
+            const { latitude, longitude, radiusKm = 50 } = data;
+
+            if (latitude === undefined || longitude === undefined) {
+                socket.emit('error', {
+                    event: 'admin:get-nearby-safety-scores',
+                    message: 'latitude and longitude are required'
+                });
+                return;
+            }
+
+            const radiusMeters = Math.min(radiusKm, 500) * 1000;
+
+            const scores = await SafetyScore.find({
+                location: {
+                    $near: {
+                        $geometry: {
+                            type: 'Point',
+                            coordinates: [longitude, latitude]
+                        },
+                        $maxDistance: radiusMeters
+                    }
+                }
+            }).limit(100).lean();
+
+            const formattedScores = scores.map(score => ({
+                id: score._id.toString(),
+                name: score.name,
+                latitude: score.location.coordinates[1],
+                longitude: score.location.coordinates[0],
+                safetyScore: score.safetyScore,
+                riskLevel: score.riskLevel,
+                crimeRate: score.crimeRate
+            }));
+
+            socket.emit('admin:nearby-safety-scores', {
+                center: { latitude, longitude },
+                radiusKm: Math.min(radiusKm, 500),
+                count: formattedScores.length,
+                scores: formattedScores
+            });
+
+        } catch (error) {
+            console.error('Admin get nearby safety scores error:', error);
+            socket.emit('error', {
+                event: 'admin:get-nearby-safety-scores',
+                message: 'Failed to get nearby safety scores'
+            });
+        }
+    });
+
+    /**
+     * EVENT: admin:get-safety-stats
+     * Get safety score statistics
+     * 
+     * Payload: {} (empty)
+     * 
+     * Response Event: admin:safety-stats
+     */
+    socket.on('admin:get-safety-stats', async () => {
+        try {
+            const [total, byRiskLevel, avgStats] = await Promise.all([
+                SafetyScore.countDocuments(),
+                SafetyScore.aggregate([
+                    {
+                        $group: {
+                            _id: '$riskLevel',
+                            count: { $sum: 1 },
+                            avgScore: { $avg: '$safetyScore' },
+                            avgCrimeRate: { $avg: '$crimeRate' }
+                        }
+                    },
+                    { $sort: { avgScore: -1 } }
+                ]),
+                SafetyScore.aggregate([
+                    {
+                        $group: {
+                            _id: null,
+                            avgSafetyScore: { $avg: '$safetyScore' },
+                            avgCrimeRate: { $avg: '$crimeRate' },
+                            maxSafetyScore: { $max: '$safetyScore' },
+                            minSafetyScore: { $min: '$safetyScore' },
+                            totalPopulation: { $sum: '$population' }
+                        }
+                    }
+                ])
+            ]);
+
+            const riskLevelStats = {};
+            byRiskLevel.forEach(item => {
+                riskLevelStats[item._id] = {
+                    count: item.count,
+                    avgScore: Math.round(item.avgScore * 100) / 100,
+                    avgCrimeRate: Math.round(item.avgCrimeRate * 100) / 100
+                };
+            });
+
+            const summary = avgStats[0] || {
+                avgSafetyScore: 0,
+                avgCrimeRate: 0,
+                maxSafetyScore: 0,
+                minSafetyScore: 0,
+                totalPopulation: 0
+            };
+
+            socket.emit('admin:safety-stats', {
+                totalLocations: total,
+                summary: {
+                    avgSafetyScore: Math.round(summary.avgSafetyScore * 100) / 100,
+                    avgCrimeRate: Math.round(summary.avgCrimeRate * 100) / 100,
+                    maxSafetyScore: summary.maxSafetyScore,
+                    minSafetyScore: summary.minSafetyScore,
+                    totalPopulation: summary.totalPopulation
+                },
+                byRiskLevel: riskLevelStats
+            });
+
+        } catch (error) {
+            console.error('Admin get safety stats error:', error);
+            socket.emit('error', {
+                event: 'admin:get-safety-stats',
+                message: 'Failed to get safety statistics'
+            });
+        }
+    });
+
+    // ==================== GEOFENCE EVENTS ====================
+
+    /**
+     * EVENT: admin:get-all-geofences
+     * Get all geofences with optional filters
+     * 
+     * Payload:
+     * {
+     *   page: number (optional, default 1),
+     *   limit: number (optional, default 50),
+     *   fenceType: string (optional) - 'safety' or 'restricted',
+     *   isActive: boolean (optional),
+     *   search: string (optional) - search by name
+     * }
+     * 
+     * Response Event: admin:all-geofences
+     */
+    socket.on('admin:get-all-geofences', async (data = {}) => {
+        try {
+            const {
+                page = 1,
+                limit = 50,
+                fenceType,
+                isActive,
+                search
+            } = data;
+
+            const query = {};
+            
+            if (fenceType) {
+                query.fenceType = fenceType;
+            }
+            
+            if (isActive !== undefined) {
+                query.isActive = isActive;
+            }
+            
+            if (search) {
+                query.name = { $regex: search, $options: 'i' };
+            }
+
+            const skip = (parseInt(page) - 1) * parseInt(limit);
+
+            const [geofences, total] = await Promise.all([
+                Geofence.find(query)
+                    .sort({ createdAt: -1 })
+                    .skip(skip)
+                    .limit(Math.min(parseInt(limit), 100))
+                    .lean(),
+                Geofence.countDocuments(query)
+            ]);
+
+            const formattedGeofences = geofences.map(fence => ({
+                id: fence._id.toString(),
+                name: fence.name,
+                description: fence.description,
+                latitude: fence.location.coordinates[1],
+                longitude: fence.location.coordinates[0],
+                radius: fence.radius,
+                fenceType: fence.fenceType,
+                isActive: fence.isActive,
+                createdAt: fence.createdAt,
+                updatedAt: fence.updatedAt
+            }));
+
+            socket.emit('admin:all-geofences', {
+                geofences: formattedGeofences,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    total,
+                    pages: Math.ceil(total / parseInt(limit))
+                },
+                filters: { fenceType, isActive, search }
+            });
+
+        } catch (error) {
+            console.error('Admin get all geofences error:', error);
+            socket.emit('error', {
+                event: 'admin:get-all-geofences',
+                message: 'Failed to get geofences'
+            });
+        }
+    });
+
+    /**
+     * EVENT: admin:get-geofence
+     * Get a specific geofence by ID
+     * 
+     * Payload:
+     * {
+     *   geofenceId: string (required)
+     * }
+     * 
+     * Response Event: admin:geofence-details
+     */
+    socket.on('admin:get-geofence', async (data) => {
+        try {
+            const { geofenceId } = data;
+
+            if (!geofenceId || !mongoose.Types.ObjectId.isValid(geofenceId)) {
+                socket.emit('error', {
+                    event: 'admin:get-geofence',
+                    message: 'Valid geofenceId is required'
+                });
+                return;
+            }
+
+            const geofence = await Geofence.findById(geofenceId).lean();
+
+            if (!geofence) {
+                socket.emit('error', {
+                    event: 'admin:get-geofence',
+                    message: 'Geofence not found'
+                });
+                return;
+            }
+
+            socket.emit('admin:geofence-details', {
+                id: geofence._id.toString(),
+                name: geofence.name,
+                description: geofence.description,
+                latitude: geofence.location.coordinates[1],
+                longitude: geofence.location.coordinates[0],
+                radius: geofence.radius,
+                fenceType: geofence.fenceType,
+                isActive: geofence.isActive,
+                createdAt: geofence.createdAt,
+                updatedAt: geofence.updatedAt
+            });
+
+        } catch (error) {
+            console.error('Admin get geofence error:', error);
+            socket.emit('error', {
+                event: 'admin:get-geofence',
+                message: 'Failed to get geofence'
+            });
+        }
+    });
+
+    /**
+     * EVENT: admin:create-geofence
+     * Create a new geofence
+     * 
+     * Payload:
+     * {
+     *   name: string (required, max 100 chars),
+     *   description: string (optional, max 500 chars),
+     *   latitude: number (required),
+     *   longitude: number (required),
+     *   radius: number (required, 1-100000 meters),
+     *   fenceType: string (required) - 'safety' or 'restricted',
+     *   isActive: boolean (optional, default true)
+     * }
+     * 
+     * Response Event: admin:geofence-created
+     */
+    socket.on('admin:create-geofence', async (data) => {
+        try {
+            const { name, description, latitude, longitude, radius, fenceType, isActive = true } = data;
+
+            // Validation
+            if (!name || !latitude || !longitude || !radius || !fenceType) {
+                socket.emit('error', {
+                    event: 'admin:create-geofence',
+                    message: 'name, latitude, longitude, radius, and fenceType are required'
+                });
+                return;
+            }
+
+            if (!['safety', 'restricted'].includes(fenceType)) {
+                socket.emit('error', {
+                    event: 'admin:create-geofence',
+                    message: 'fenceType must be "safety" or "restricted"'
+                });
+                return;
+            }
+
+            if (radius < 1 || radius > 100000) {
+                socket.emit('error', {
+                    event: 'admin:create-geofence',
+                    message: 'radius must be between 1 and 100000 meters'
+                });
+                return;
+            }
+
+            const geofence = await Geofence.create({
+                name: name.trim(),
+                description: description?.trim(),
+                location: {
+                    type: 'Point',
+                    coordinates: [longitude, latitude]
+                },
+                radius,
+                fenceType,
+                isActive
+            });
+
+            const response = {
+                id: geofence._id.toString(),
+                name: geofence.name,
+                description: geofence.description,
+                latitude: geofence.location.coordinates[1],
+                longitude: geofence.location.coordinates[0],
+                radius: geofence.radius,
+                fenceType: geofence.fenceType,
+                isActive: geofence.isActive,
+                createdAt: geofence.createdAt
+            };
+
+            // Broadcast to all admins
+            io.of('/admin').emit('admin:geofence-created', response);
+
+        } catch (error) {
+            console.error('Admin create geofence error:', error);
+            socket.emit('error', {
+                event: 'admin:create-geofence',
+                message: error.message || 'Failed to create geofence'
+            });
+        }
+    });
+
+    /**
+     * EVENT: admin:update-geofence
+     * Update an existing geofence
+     * 
+     * Payload:
+     * {
+     *   geofenceId: string (required),
+     *   name: string (optional),
+     *   description: string (optional),
+     *   latitude: number (optional),
+     *   longitude: number (optional),
+     *   radius: number (optional),
+     *   fenceType: string (optional),
+     *   isActive: boolean (optional)
+     * }
+     * 
+     * Response Event: admin:geofence-updated
+     */
+    socket.on('admin:update-geofence', async (data) => {
+        try {
+            const { geofenceId, name, description, latitude, longitude, radius, fenceType, isActive } = data;
+
+            if (!geofenceId || !mongoose.Types.ObjectId.isValid(geofenceId)) {
+                socket.emit('error', {
+                    event: 'admin:update-geofence',
+                    message: 'Valid geofenceId is required'
+                });
+                return;
+            }
+
+            const geofence = await Geofence.findById(geofenceId);
+
+            if (!geofence) {
+                socket.emit('error', {
+                    event: 'admin:update-geofence',
+                    message: 'Geofence not found'
+                });
+                return;
+            }
+
+            // Update fields
+            if (name !== undefined) geofence.name = name.trim();
+            if (description !== undefined) geofence.description = description?.trim();
+            if (radius !== undefined) {
+                if (radius < 1 || radius > 100000) {
+                    socket.emit('error', {
+                        event: 'admin:update-geofence',
+                        message: 'radius must be between 1 and 100000 meters'
+                    });
+                    return;
+                }
+                geofence.radius = radius;
+            }
+            if (fenceType !== undefined) {
+                if (!['safety', 'restricted'].includes(fenceType)) {
+                    socket.emit('error', {
+                        event: 'admin:update-geofence',
+                        message: 'fenceType must be "safety" or "restricted"'
+                    });
+                    return;
+                }
+                geofence.fenceType = fenceType;
+            }
+            if (isActive !== undefined) geofence.isActive = isActive;
+            
+            // Update location if both lat/lng provided
+            if (latitude !== undefined && longitude !== undefined) {
+                geofence.location = {
+                    type: 'Point',
+                    coordinates: [longitude, latitude]
+                };
+            }
+
+            await geofence.save();
+
+            const response = {
+                id: geofence._id.toString(),
+                name: geofence.name,
+                description: geofence.description,
+                latitude: geofence.location.coordinates[1],
+                longitude: geofence.location.coordinates[0],
+                radius: geofence.radius,
+                fenceType: geofence.fenceType,
+                isActive: geofence.isActive,
+                createdAt: geofence.createdAt,
+                updatedAt: geofence.updatedAt
+            };
+
+            // Broadcast to all admins
+            io.of('/admin').emit('admin:geofence-updated', response);
+
+        } catch (error) {
+            console.error('Admin update geofence error:', error);
+            socket.emit('error', {
+                event: 'admin:update-geofence',
+                message: error.message || 'Failed to update geofence'
+            });
+        }
+    });
+
+    /**
+     * EVENT: admin:delete-geofence
+     * Delete a geofence
+     * 
+     * Payload:
+     * {
+     *   geofenceId: string (required)
+     * }
+     * 
+     * Response Event: admin:geofence-deleted
+     */
+    socket.on('admin:delete-geofence', async (data) => {
+        try {
+            const { geofenceId } = data;
+
+            if (!geofenceId || !mongoose.Types.ObjectId.isValid(geofenceId)) {
+                socket.emit('error', {
+                    event: 'admin:delete-geofence',
+                    message: 'Valid geofenceId is required'
+                });
+                return;
+            }
+
+            const geofence = await Geofence.findByIdAndDelete(geofenceId);
+
+            if (!geofence) {
+                socket.emit('error', {
+                    event: 'admin:delete-geofence',
+                    message: 'Geofence not found'
+                });
+                return;
+            }
+
+            // Broadcast to all admins
+            io.of('/admin').emit('admin:geofence-deleted', {
+                geofenceId,
+                name: geofence.name,
+                deletedBy: socket.user?.name || 'Admin'
+            });
+
+        } catch (error) {
+            console.error('Admin delete geofence error:', error);
+            socket.emit('error', {
+                event: 'admin:delete-geofence',
+                message: 'Failed to delete geofence'
+            });
+        }
+    });
+
+    /**
+     * EVENT: admin:toggle-geofence
+     * Toggle geofence active status
+     * 
+     * Payload:
+     * {
+     *   geofenceId: string (required)
+     * }
+     * 
+     * Response Event: admin:geofence-toggled
+     */
+    socket.on('admin:toggle-geofence', async (data) => {
+        try {
+            const { geofenceId } = data;
+
+            if (!geofenceId || !mongoose.Types.ObjectId.isValid(geofenceId)) {
+                socket.emit('error', {
+                    event: 'admin:toggle-geofence',
+                    message: 'Valid geofenceId is required'
+                });
+                return;
+            }
+
+            const geofence = await Geofence.findById(geofenceId);
+
+            if (!geofence) {
+                socket.emit('error', {
+                    event: 'admin:toggle-geofence',
+                    message: 'Geofence not found'
+                });
+                return;
+            }
+
+            geofence.isActive = !geofence.isActive;
+            await geofence.save();
+
+            // Broadcast to all admins
+            io.of('/admin').emit('admin:geofence-toggled', {
+                geofenceId,
+                name: geofence.name,
+                isActive: geofence.isActive,
+                toggledBy: socket.user?.name || 'Admin'
+            });
+
+        } catch (error) {
+            console.error('Admin toggle geofence error:', error);
+            socket.emit('error', {
+                event: 'admin:toggle-geofence',
+                message: 'Failed to toggle geofence'
+            });
+        }
+    });
+
+    /**
+     * EVENT: admin:get-geofences-at-location
+     * Get all geofences that contain a specific point
+     * 
+     * Payload:
+     * {
+     *   latitude: number (required),
+     *   longitude: number (required)
+     * }
+     * 
+     * Response Event: admin:geofences-at-location
+     */
+    socket.on('admin:get-geofences-at-location', async (data) => {
+        try {
+            const { latitude, longitude } = data;
+
+            if (latitude === undefined || longitude === undefined) {
+                socket.emit('error', {
+                    event: 'admin:get-geofences-at-location',
+                    message: 'latitude and longitude are required'
+                });
+                return;
+            }
+
+            // Find all active geofences and check if point is within radius
+            const geofences = await Geofence.find({ isActive: true }).lean();
+            
+            const containingGeofences = geofences.filter(fence => {
+                const fenceLat = fence.location.coordinates[1];
+                const fenceLng = fence.location.coordinates[0];
+                const distance = calculateDistance(latitude, longitude, fenceLat, fenceLng);
+                return distance <= fence.radius;
+            });
+
+            socket.emit('admin:geofences-at-location', {
+                point: { latitude, longitude },
+                count: containingGeofences.length,
+                geofences: containingGeofences.map(fence => ({
+                    id: fence._id.toString(),
+                    name: fence.name,
+                    fenceType: fence.fenceType,
+                    radius: fence.radius,
+                    latitude: fence.location.coordinates[1],
+                    longitude: fence.location.coordinates[0]
+                }))
+            });
+
+        } catch (error) {
+            console.error('Admin get geofences at location error:', error);
+            socket.emit('error', {
+                event: 'admin:get-geofences-at-location',
+                message: 'Failed to get geofences at location'
+            });
+        }
+    });
+
+    /**
+     * EVENT: admin:get-geofence-stats
+     * Get geofence statistics
+     * 
+     * Payload: {} (empty)
+     * 
+     * Response Event: admin:geofence-stats
+     */
+    socket.on('admin:get-geofence-stats', async () => {
+        try {
+            const stats = await Geofence.aggregate([
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: 1 },
+                        active: { $sum: { $cond: ['$isActive', 1, 0] } },
+                        inactive: { $sum: { $cond: ['$isActive', 0, 1] } },
+                        safetyZones: { $sum: { $cond: [{ $eq: ['$fenceType', 'safety'] }, 1, 0] } },
+                        restrictedZones: { $sum: { $cond: [{ $eq: ['$fenceType', 'restricted'] }, 1, 0] } },
+                        avgRadius: { $avg: '$radius' },
+                        maxRadius: { $max: '$radius' },
+                        minRadius: { $min: '$radius' }
+                    }
+                }
+            ]);
+
+            const summary = stats[0] || {
+                total: 0,
+                active: 0,
+                inactive: 0,
+                safetyZones: 0,
+                restrictedZones: 0,
+                avgRadius: 0,
+                maxRadius: 0,
+                minRadius: 0
+            };
+
+            socket.emit('admin:geofence-stats', {
+                total: summary.total,
+                active: summary.active,
+                inactive: summary.inactive,
+                byType: {
+                    safety: summary.safetyZones,
+                    restricted: summary.restrictedZones
+                },
+                radiusStats: {
+                    avg: Math.round(summary.avgRadius),
+                    max: summary.maxRadius,
+                    min: summary.minRadius
+                }
+            });
+
+        } catch (error) {
+            console.error('Admin get geofence stats error:', error);
+            socket.emit('error', {
+                event: 'admin:get-geofence-stats',
+                message: 'Failed to get geofence statistics'
+            });
+        }
+    });
+}
+
+// Helper function to calculate distance between two points in meters (Haversine formula)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
 }
