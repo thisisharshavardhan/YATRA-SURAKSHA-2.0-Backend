@@ -41,7 +41,34 @@ export const triggerSOS = asyncHandler(async (req, res) => {
     });
 
     // Get user's emergency contacts for notification
-    const user = await User.findById(req.user._id).select('name emergencyContacts phoneNumber');
+    const user = await User.findById(req.user._id).select('name emergencyContacts phoneNumber profilePicture');
+
+    // Emit to admin dashboard via WebSocket (sos:emergency event for frontend)
+    const io = req.app.get('io');
+    if (io) {
+        io.emitToAdmins('sos:emergency', {
+            alertId: alert._id,
+            alert: alert,
+            userId: req.user._id,
+            user: {
+                _id: req.user._id,
+                name: user.name,
+                phoneNumber: user.phoneNumber,
+                profilePicture: user.profilePicture
+            },
+            location: {
+                latitude,
+                longitude
+            },
+            severity: 'critical',
+            status: 'active',
+            alertType: 'sos',
+            description: alert.description,
+            timestamp: alert.createdAt,
+            createdAt: alert.createdAt,
+            source: 'rest_api'
+        });
+    }
 
     // TODO: Send notifications to emergency contacts
     // This could be via SMS, Push Notification, or Email
@@ -112,6 +139,29 @@ export const triggerLowBatteryAlert = asyncHandler(async (req, res) => {
         timestamp: new Date()
     });
 
+    // Emit to admin dashboard via WebSocket (alert:low-battery event for frontend)
+    const io = req.app.get('io');
+    if (io) {
+        io.emitToAdmins('alert:low-battery', {
+            alertId: alert._id,
+            alert: alert,
+            userId: req.user._id,
+            user: {
+                _id: req.user._id,
+                name: req.user.name
+            },
+            alertType: 'low_battery',
+            location: { latitude, longitude },
+            severity,
+            status: 'active',
+            batteryLevel,
+            description: alert.description,
+            timestamp: alert.createdAt,
+            createdAt: alert.createdAt,
+            source: 'rest_api'
+        });
+    }
+
     res.status(201).json({
         success: true,
         message: 'Low battery alert triggered',
@@ -171,7 +221,33 @@ export const triggerGeofenceAlert = asyncHandler(async (req, res) => {
     });
 
     // Get user's emergency contacts for notification
-    const user = await User.findById(req.user._id).select('name emergencyContacts phoneNumber');
+    const user = await User.findById(req.user._id).select('name emergencyContacts phoneNumber profilePicture');
+
+    // Emit to admin dashboard via WebSocket (alert:geofence event for frontend)
+    const io = req.app.get('io');
+    if (io) {
+        io.emitToAdmins('alert:geofence', {
+            alertId: alert._id,
+            alert: alert,
+            userId: req.user._id,
+            user: {
+                _id: req.user._id,
+                name: user.name,
+                phoneNumber: user.phoneNumber,
+                profilePicture: user.profilePicture
+            },
+            alertType,
+            location: { latitude, longitude },
+            severity: 'high',
+            status: 'active',
+            geofenceId,
+            geofenceName,
+            description: alert.description,
+            timestamp: alert.createdAt,
+            createdAt: alert.createdAt,
+            source: 'rest_api'
+        });
+    }
 
     res.status(201).json({
         success: true,

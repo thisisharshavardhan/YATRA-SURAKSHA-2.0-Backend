@@ -479,10 +479,8 @@ router.delete('/:videoId', deleteVideo);
  *         description: Videos retrieved successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
- *       403:
- *         $ref: '#/components/responses/ForbiddenError'
  */
-router.get('/admin/all', isAdmin, getAllVideos);
+router.get('/admin/all', getAllVideos);
 
 /**
  * @swagger
@@ -529,10 +527,8 @@ router.get('/admin/all', isAdmin, getAllVideos);
  *                       type: integer
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
- *       403:
- *         $ref: '#/components/responses/ForbiddenError'
  */
-router.delete('/admin/bulk', isAdmin, bulkDeleteVideos);
+router.delete('/admin/bulk', bulkDeleteVideos);
 
 export default router;
 

@@ -169,6 +169,26 @@ export function initializeSocket(httpServer) {
     io.getOnlineUsersCount = () => onlineUsers.size;
     io.getOnlineUsers = () => Array.from(onlineUsers.values());
     io.isUserOnline = (userId) => onlineUsers.has(userId);
+    
+    // Helper to emit events to all connected admins (for REST API -> WebSocket bridge)
+    io.emitToAdmins = (event, data) => {
+        adminNamespace.emit(event, data);
+    };
+
+    // Helper to emit to a specific user if online
+    io.emitToUser = (userId, event, data) => {
+        const userInfo = onlineUsers.get(userId);
+        if (userInfo) {
+            userNamespace.to(userInfo.socketId).emit(event, data);
+            return true;
+        }
+        return false;
+    };
+
+    // Helper to emit to a group
+    io.emitToGroup = (groupId, event, data) => {
+        userNamespace.to(`group:${groupId}`).emit(event, data);
+    };
 
     console.log('Socket.IO initialized');
     return io;

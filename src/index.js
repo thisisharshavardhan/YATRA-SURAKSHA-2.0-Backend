@@ -92,6 +92,11 @@ app.get('/voice-assistant', (req, res) => {
     res.sendFile(join(__dirname, '../public/voice-assistant.html'));
 });
 
+// Location WebSocket Tester
+app.get('/test-location', (req, res) => {
+    res.sendFile(join(__dirname, '../public/test-location.html'));
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
