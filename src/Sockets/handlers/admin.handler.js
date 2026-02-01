@@ -1049,7 +1049,7 @@ export default function adminHandler(io, socket, userNamespace, onlineUsers) {
      * Payload:
      * {
      *   page: number (optional, default 1),
-     *   limit: number (optional, default 50, max 500),
+     *   limit: number (optional, default 0 = all, max 1000),
      *   riskLevel: string (optional) - 'Low Risk', 'Moderate Risk', 'Medium Risk', 'High Risk', 'Extreme Risk',
      *   sortBy: string (optional) - 'safetyScore', 'name', 'crimeRate', 'population',
      *   order: string (optional) - 'asc' or 'desc',
@@ -1062,7 +1062,7 @@ export default function adminHandler(io, socket, userNamespace, onlineUsers) {
         try {
             const {
                 page = 1,
-                limit = 50,
+                limit = 0,  // 0 means no limit (get all)
                 riskLevel,
                 sortBy = 'safetyScore',
                 order = 'desc',
@@ -1079,17 +1079,23 @@ export default function adminHandler(io, socket, userNamespace, onlineUsers) {
                 query.name = { $regex: search, $options: 'i' };
             }
 
-            const skip = (parseInt(page) - 1) * parseInt(limit);
             const sortOrder = order === 'asc' ? 1 : -1;
             const validSortFields = ['safetyScore', 'name', 'crimeRate', 'population', 'populationDensity', 'safetyRank'];
             const sortField = validSortFields.includes(sortBy) ? sortBy : 'safetyScore';
 
+            // If limit is 0 or not provided, get all records (no pagination)
+            const parsedLimit = parseInt(limit);
+            const useLimit = parsedLimit > 0 ? Math.min(parsedLimit, 1000) : 0;
+            const skip = useLimit > 0 ? (parseInt(page) - 1) * useLimit : 0;
+
+            let queryBuilder = SafetyScore.find(query).sort({ [sortField]: sortOrder });
+            
+            if (useLimit > 0) {
+                queryBuilder = queryBuilder.skip(skip).limit(useLimit);
+            }
+
             const [scores, total] = await Promise.all([
-                SafetyScore.find(query)
-                    .sort({ [sortField]: sortOrder })
-                    .skip(skip)
-                    .limit(Math.min(parseInt(limit), 500))
-                    .lean(),
+                queryBuilder.lean(),
                 SafetyScore.countDocuments(query)
             ]);
 
@@ -1110,11 +1116,16 @@ export default function adminHandler(io, socket, userNamespace, onlineUsers) {
 
             socket.emit('admin:all-safety-scores', {
                 scores: formattedScores,
-                pagination: {
+                pagination: useLimit > 0 ? {
                     page: parseInt(page),
-                    limit: parseInt(limit),
+                    limit: useLimit,
                     total,
-                    pages: Math.ceil(total / parseInt(limit))
+                    pages: Math.ceil(total / useLimit)
+                } : {
+                    page: 1,
+                    limit: total,
+                    total,
+                    pages: 1
                 },
                 filters: { riskLevel, search }
             });
