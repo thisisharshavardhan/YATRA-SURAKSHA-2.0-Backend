@@ -35,8 +35,7 @@ const videoSchema = new mongoose.Schema({
     relatedAlertID: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Alert',
-        required: false,
-        index: true
+        required: false
     },
 }, {
     timestamps: true,

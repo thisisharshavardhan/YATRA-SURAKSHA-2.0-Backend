@@ -23,6 +23,7 @@ import geofenceRoutes from './Routes/geofence.routes.js';
 import tripRoutes from './Routes/trip.routes.js';
 import safetyScoreRoutes from './Routes/safetyScore.routes.js';
 import voiceAssistantRoutes from './Routes/voiceAssistant.routes.js';
+import videoRoutes from './Routes/video.routes.js';
 
 // Initialize Firebase
 import './Configs/firebase.config.js';
@@ -46,6 +47,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static files
 app.use(express.static(join(__dirname, '../public')));
+
+// Serve uploaded files (videos and thumbnails)
+app.use('/uploads', express.static(join(__dirname, '../uploads')));
 
 // Swagger API Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
@@ -98,6 +102,7 @@ app.use('/api/geofences', geofenceRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/safety-scores', safetyScoreRoutes);
 app.use('/api/voice-assistant', voiceAssistantRoutes);
+app.use('/api/videos', videoRoutes);
 
 // 404 handler
 app.use(notFoundHandler);

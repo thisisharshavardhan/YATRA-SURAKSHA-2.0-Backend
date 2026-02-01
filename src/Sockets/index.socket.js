@@ -113,23 +113,51 @@ export function initializeSocket(httpServer) {
     // =====================
     adminNamespace.use(adminSocketAuth);
 
-    adminNamespace.on('connection', (socket) => {
+    adminNamespace.on('connection', async (socket) => {
         console.log(`Admin connected: ${socket.user.name}`);
         adminSockets.add(socket.id);
 
         // Register admin handlers
         adminHandler(io, socket, userNamespace, onlineUsers);
 
-        // Send current online users
-        socket.emit('users:online', {
-            count: onlineUsers.size,
-            users: Array.from(onlineUsers.values()).map(u => ({
-                userId: u.user._id.toString(),
-                name: u.user.name,
-                email: u.user.email,
-                connectedAt: u.connectedAt
-            }))
-        });
+        // Send ALL users from database with online status
+        try {
+            const User = (await import('../Models/user.model.js')).default;
+            const allUsers = await User.find({ role: 'user' })
+                .select('name email profilePicture phoneNumber createdAt')
+                .lean();
+
+            const usersWithStatus = allUsers.map(user => ({
+                userId: user._id.toString(),
+                name: user.name,
+                email: user.email,
+                profilePicture: user.profilePicture,
+                phoneNumber: user.phoneNumber,
+                isOnline: onlineUsers.has(user._id.toString()),
+                connectedAt: onlineUsers.get(user._id.toString())?.connectedAt || null,
+                registeredAt: user.createdAt
+            }));
+
+            socket.emit('users:online', {
+                count: usersWithStatus.length,
+                onlineCount: onlineUsers.size,
+                users: usersWithStatus
+            });
+        } catch (error) {
+            console.error('Error fetching users for admin:', error);
+            // Fallback to only online users
+            socket.emit('users:online', {
+                count: onlineUsers.size,
+                onlineCount: onlineUsers.size,
+                users: Array.from(onlineUsers.values()).map(u => ({
+                    userId: u.user._id.toString(),
+                    name: u.user.name,
+                    email: u.user.email,
+                    isOnline: true,
+                    connectedAt: u.connectedAt
+                }))
+            });
+        }
 
         socket.on('disconnect', () => {
             adminSockets.delete(socket.id);
