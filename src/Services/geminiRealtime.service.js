@@ -6,7 +6,7 @@ import Alert from '../Models/alert.model.js';
 
 // Gemini Live API Configuration
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-preview-12-2025';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-dialog';
 const GEMINI_WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent`;
 
 // POI API Configuration (FastAPI + PostGIS for nearby places)
@@ -692,114 +692,82 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
      * @param {Object} currentLocation - { longitude, latitude }
      * @param {Object} voiceSettings - { temperature, silence_duration_ms }
      */
-    async createSession(user, clientSocket, currentLocation = null, voiceSettings = {}) {
-        const userId = user._id.toString();
+    async createSession(user, socket, currentLocation = null, voiceSettings = {}) {
+        try {
+            // Close existing session if any
+            if (this.sessions.has(user._id.toString())) {
+                await this.closeSession(user._id.toString());
+            }
 
-        // Close existing session if any
-        if (this.sessions.has(userId)) {
-            await this.closeSession(userId);
-        }
+            const userId = user._id.toString();
+            console.log(`[Gemini] Creating session for user: ${userId}`);
 
-        // Get location if not provided
-        if (!currentLocation) {
-            currentLocation = await this.getLastLocation(user._id);
-        }
+            // Get location if not provided
+            if (!currentLocation) {
+                currentLocation = await this.getLastLocation(userId);
+            }
 
-        // Build context-aware instructions
-        const instructions = await this.buildSystemInstructions(user, currentLocation);
+            // Build system instructions
+            const systemInstructions = await this.buildSystemInstructions(user, currentLocation);
 
-        // Apply voice settings with defaults
-        const settings = {
-            temperature: voiceSettings.temperature || 0.7,
-            silence_duration_ms: voiceSettings.silence_duration_ms || 300,
-            max_tokens: voiceSettings.max_tokens || 1024
-        };
+            // Initialize Gemini Live API client
+            console.log('[Gemini] Initializing Gemini Live API...');
+            
+            // **FIX: Check if API key exists**
+            if (!process.env.GEMINI_API_KEY) {
+                throw new Error('GEMINI_API_KEY not found in environment variables');
+            }
 
-        console.log(`[Gemini] Creating session with settings:`, settings);
-
-        // Connect to Gemini Live API via WebSocket
-        const wsUrl = `${GEMINI_WS_URL}?key=${GEMINI_API_KEY}`;
-
-        return new Promise((resolve, reject) => {
-            const geminiWs = new WebSocket(wsUrl);
-
-            geminiWs.on('open', () => {
-                console.log(`Gemini-Realtime session opened for user: ${user.name}`);
-
-                // Send the setup message (must be the first message)
-                const setupMessage = {
-                    setup: {
-                        model: `models/${GEMINI_MODEL}`,
-                        generationConfig: {
-                            responseModalities: ['AUDIO'],
-                            temperature: settings.temperature,
-                            maxOutputTokens: settings.max_tokens,
-                            speechConfig: {
-                                voiceConfig: {
-                                    prebuiltVoiceConfig: {
-                                        voiceName: 'Aoede'
-                                    }
-                                }
-                            }
-                        },
-                        systemInstruction: {
-                            parts: [{ text: instructions }]
-                        },
-                        tools: this.getAvailableTools(),
-                        realtimeInputConfig: {
-                            automaticActivityDetection: {
-                                disabled: false,
-                                silenceDurationMs: settings.silence_duration_ms,
-                                startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
-                                endOfSpeechSensitivity: 'END_SENSITIVITY_HIGH'
-                            }
-                        },
-                        inputAudioTranscription: {},
-                        outputAudioTranscription: {}
-                    }
-                };
-
-                geminiWs.send(JSON.stringify(setupMessage));
-
-                // Store session
-                this.sessions.set(userId, {
-                    geminiWs,
-                    clientSocket,
-                    user,
-                    currentLocation,
-                    createdAt: new Date(),
-                    pendingToolCalls: new Map() // Track pending function calls
-                });
-
-                // Don't resolve yet - wait for setupComplete
-            });
-
-            geminiWs.on('message', (data) => {
-                try {
-                    const message = JSON.parse(data.toString());
-                    this.handleGeminiMessage(userId, message, resolve);
-                } catch (error) {
-                    console.error('Error parsing Gemini message:', error);
+            const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-dialog';
+            
+            // Initialize the Gemini client with correct configuration
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            
+            // **FIX: Use correct Live API initialization**
+            const geminiModel = genAI.getGenerativeModel({
+                model: model,
+                systemInstruction: systemInstructions,
+                tools: this.getAvailableTools(),
+                generationConfig: {
+                    temperature: 0.7,
+                    candidateCount: 1,
                 }
             });
 
-            geminiWs.on('error', (error) => {
-                console.error(`Gemini-Realtime WebSocket error for ${user.name}:`, error);
-                clientSocket.emit('gemini:error', {
-                    message: 'Connection error with Gemini AI service',
-                    code: error.code
-                });
-                reject(error);
+            // Create live session
+            const liveSession = await geminiModel.startChat({
+                generationConfig: {
+                    responseModalities: ['AUDIO', 'TEXT'],
+                },
             });
 
-            geminiWs.on('close', (code, reason) => {
-                console.log(`Gemini-Realtime session closed for user: ${user.name} (code: ${code})`);
-                this.sessions.delete(userId);
-                clientSocket.emit('gemini:disconnected', {
-                    message: 'Gemini AI session ended'
-                });
+            console.log('[Gemini] Live session created successfully');
+
+            // Store session
+            this.sessions.set(userId, {
+                liveSession: liveSession,
+                clientSocket: socket,
+                user: user,
+                currentLocation: currentLocation,
+                createdAt: new Date()
             });
-        });
+
+            // Emit success to client
+            socket.emit('gemini:session-created', {
+                sessionId: userId,
+                model: model
+            });
+
+            return {
+                success: true,
+                sessionId: userId,
+                message: 'Gemini session created successfully'
+            };
+
+        } catch (error) {
+            console.error('[Gemini] Error creating session:', error);
+            throw error;
+        }
     }
 
     /**
