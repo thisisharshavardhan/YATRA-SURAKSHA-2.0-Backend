@@ -11,7 +11,7 @@ const DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-realtime';
 const API_KEY = process.env.AZURE_OPENAI_API_KEY;
 
 // POI API Configuration (FastAPI + PostGIS for nearby places)
-const POI_API_BASE = process.env.POI_API_URL || 'http://localhost:8000';
+const POI_API_BASE = process.env.POI_API_URL || 'http://135.235.138.50:8000';
 
 // Validate required environment variables
 if (!AZURE_ENDPOINT || !API_KEY) {
