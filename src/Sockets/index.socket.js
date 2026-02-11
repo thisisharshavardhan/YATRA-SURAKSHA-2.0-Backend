@@ -4,6 +4,7 @@ import locationHandler from './handlers/location.handler.js';
 import sosHandler from './handlers/sos.handler.js';
 import adminHandler from './handlers/admin.handler.js';
 import gptRealtimeHandler from './handlers/gptRealtime.handler.js';
+import geminiRealtimeHandler from './handlers/geminiRealtime.handler.js';
 import Group from '../Models/group.model.js';
 
 // Store online users
@@ -51,11 +52,26 @@ export function initializeSocket(httpServer) {
         // Auto-join user's groups
         await autoJoinGroups(socket);
 
-        // Notify admins about new user
+        // Notify admins about new user with full profile details
         adminNamespace.emit('user:online', {
             userId,
             name: socket.user.name,
             email: socket.user.email,
+            profilePicture: socket.user.profilePicture || null,
+            phoneNumber: socket.user.phoneNumber || null,
+            alternativePhoneNumber: socket.user.alternativePhoneNumber || null,
+            whatsappNumber: socket.user.whatsappNumber || null,
+            emergencyContacts: socket.user.emergencyContacts || [],
+            healthInfo: socket.user.healthInfo || null,
+            dateOfBirth: socket.user.dateOfBirth || null,
+            nationality: socket.user.nationality || null,
+            gender: socket.user.gender || null,
+            firebaseUID: socket.user.firebaseUID || null,
+            clerkID: socket.user.clerkID || null,
+            providers: socket.user.providers || [],
+            permissions: socket.user.permissions || null,
+            lastLogin: socket.user.lastLogin || null,
+            isVerified: socket.user.isVerified || false,
             connectedAt: new Date()
         });
 
@@ -63,6 +79,7 @@ export function initializeSocket(httpServer) {
         locationHandler(io, socket, userNamespace, adminNamespace, onlineUsers);
         sosHandler(io, socket, userNamespace, adminNamespace);
         gptRealtimeHandler(io, socket, userNamespace, adminNamespace);
+        geminiRealtimeHandler(io, socket, userNamespace, adminNamespace);
 
         // Handle group refresh (call this after joining a group via REST API)
         socket.on('group:refresh', async () => {
@@ -120,11 +137,11 @@ export function initializeSocket(httpServer) {
         // Register admin handlers
         adminHandler(io, socket, userNamespace, onlineUsers);
 
-        // Send ALL users from database with online status
+        // Send ALL users from database with online status and full profile details
         try {
             const User = (await import('../Models/user.model.js')).default;
             const allUsers = await User.find({ role: 'user' })
-                .select('name email profilePicture phoneNumber createdAt')
+                .select('name email profilePicture phoneNumber alternativePhoneNumber whatsappNumber emergencyContacts healthInfo dateOfBirth nationality gender firebaseUID clerkID providers permissions lastLogin isVerified createdAt')
                 .lean();
 
             const usersWithStatus = allUsers.map(user => ({
@@ -133,6 +150,19 @@ export function initializeSocket(httpServer) {
                 email: user.email,
                 profilePicture: user.profilePicture,
                 phoneNumber: user.phoneNumber,
+                alternativePhoneNumber: user.alternativePhoneNumber || null,
+                whatsappNumber: user.whatsappNumber || null,
+                emergencyContacts: user.emergencyContacts || [],
+                healthInfo: user.healthInfo || null,
+                dateOfBirth: user.dateOfBirth || null,
+                nationality: user.nationality || null,
+                gender: user.gender || null,
+                firebaseUID: user.firebaseUID || null,
+                clerkID: user.clerkID || null,
+                providers: user.providers || [],
+                permissions: user.permissions || null,
+                lastLogin: user.lastLogin || null,
+                isVerified: user.isVerified || false,
                 isOnline: onlineUsers.has(user._id.toString()),
                 connectedAt: onlineUsers.get(user._id.toString())?.connectedAt || null,
                 registeredAt: user.createdAt
@@ -153,6 +183,21 @@ export function initializeSocket(httpServer) {
                     userId: u.user._id.toString(),
                     name: u.user.name,
                     email: u.user.email,
+                    profilePicture: u.user.profilePicture || null,
+                    phoneNumber: u.user.phoneNumber || null,
+                    alternativePhoneNumber: u.user.alternativePhoneNumber || null,
+                    whatsappNumber: u.user.whatsappNumber || null,
+                    emergencyContacts: u.user.emergencyContacts || [],
+                    healthInfo: u.user.healthInfo || null,
+                    dateOfBirth: u.user.dateOfBirth || null,
+                    nationality: u.user.nationality || null,
+                    gender: u.user.gender || null,
+                    firebaseUID: u.user.firebaseUID || null,
+                    clerkID: u.user.clerkID || null,
+                    providers: u.user.providers || [],
+                    permissions: u.user.permissions || null,
+                    lastLogin: u.user.lastLogin || null,
+                    isVerified: u.user.isVerified || false,
                     isOnline: true,
                     connectedAt: u.connectedAt
                 }))

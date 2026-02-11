@@ -23,6 +23,7 @@ import geofenceRoutes from './Routes/geofence.routes.js';
 import tripRoutes from './Routes/trip.routes.js';
 import safetyScoreRoutes from './Routes/safetyScore.routes.js';
 import voiceAssistantRoutes from './Routes/voiceAssistant.routes.js';
+import geminiAssistantRoutes from './Routes/geminiAssistant.routes.js';
 import videoRoutes from './Routes/video.routes.js';
 
 // Initialize Firebase
@@ -107,6 +108,7 @@ app.use('/api/geofences', geofenceRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/safety-scores', safetyScoreRoutes);
 app.use('/api/voice-assistant', voiceAssistantRoutes);
+app.use('/api/gemini-assistant', geminiAssistantRoutes);
 app.use('/api/videos', videoRoutes);
 
 // 404 handler

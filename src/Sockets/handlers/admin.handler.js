@@ -1877,6 +1877,229 @@ export default function adminHandler(io, socket, userNamespace, onlineUsers) {
             });
         }
     });
+
+    // =====================
+    // USER MANAGEMENT
+    // =====================
+
+    /**
+     * EVENT: admin:get-all-users
+     * Get all users with complete profile details
+     * 
+     * Payload:
+     * {
+     *   role: string (optional, filter by role - 'user' or 'admin', default: all),
+     *   page: number (optional, default 1),
+     *   limit: number (optional, default 50),
+     *   search: string (optional, search by name/email/phone)
+     * }
+     * 
+     * Response Event: admin:all-users
+     */
+    socket.on('admin:get-all-users', async (data = {}) => {
+        try {
+            const { role, page = 1, limit = 50, search } = data;
+            const skip = (page - 1) * limit;
+
+            // Build filter
+            const filter = {};
+            if (role) filter.role = role;
+            if (search) {
+                filter.$or = [
+                    { name: { $regex: search, $options: 'i' } },
+                    { email: { $regex: search, $options: 'i' } },
+                    { phoneNumber: { $regex: search, $options: 'i' } }
+                ];
+            }
+
+            const [users, total] = await Promise.all([
+                User.find(filter)
+                    .select('name email profilePicture phoneNumber alternativePhoneNumber whatsappNumber emergencyContacts healthInfo dateOfBirth nationality gender firebaseUID clerkID providers permissions lastLogin isVerified role createdAt updatedAt')
+                    .sort({ createdAt: -1 })
+                    .skip(skip)
+                    .limit(limit)
+                    .lean(),
+                User.countDocuments(filter)
+            ]);
+
+            const formattedUsers = users.map(user => ({
+                userId: user._id.toString(),
+                name: user.name,
+                email: user.email,
+                profilePicture: user.profilePicture || null,
+                phoneNumber: user.phoneNumber || null,
+                alternativePhoneNumber: user.alternativePhoneNumber || null,
+                whatsappNumber: user.whatsappNumber || null,
+                emergencyContacts: user.emergencyContacts || [],
+                healthInfo: user.healthInfo ? {
+                    bloodGroup: user.healthInfo.bloodGroup || null,
+                    allergies: user.healthInfo.allergies || [],
+                    chronicDiseases: user.healthInfo.chronicDiseases || [],
+                    medications: user.healthInfo.medications || []
+                } : null,
+                dateOfBirth: user.dateOfBirth || null,
+                nationality: user.nationality || null,
+                gender: user.gender || null,
+                firebaseUID: user.firebaseUID || null,
+                clerkID: user.clerkID || null,
+                providers: user.providers || [],
+                permissions: user.permissions ? {
+                    allowLocationAccess: user.permissions.allowLocationAccess ?? true,
+                    allowNotificationAccess: user.permissions.allowNotificationAccess ?? true,
+                    allowSmsAccess: user.permissions.allowSmsAccess ?? false
+                } : null,
+                lastLogin: user.lastLogin || null,
+                isVerified: user.isVerified || false,
+                role: user.role,
+                isOnline: onlineUsers.has(user._id.toString()),
+                connectedAt: onlineUsers.get(user._id.toString())?.connectedAt || null,
+                registeredAt: user.createdAt,
+                updatedAt: user.updatedAt
+            }));
+
+            socket.emit('admin:all-users', {
+                count: formattedUsers.length,
+                total,
+                page,
+                totalPages: Math.ceil(total / limit),
+                onlineCount: onlineUsers.size,
+                users: formattedUsers
+            });
+
+        } catch (error) {
+            console.error('Admin get all users error:', error);
+            socket.emit('error', {
+                event: 'admin:get-all-users',
+                message: 'Failed to get all users'
+            });
+        }
+    });
+
+    /**
+     * EVENT: admin:get-user-details
+     * Get a single user's complete profile with all details
+     * 
+     * Payload:
+     * {
+     *   userId: string (required)
+     * }
+     * 
+     * Response Event: admin:user-details
+     */
+    socket.on('admin:get-user-details', async (data) => {
+        try {
+            const { userId } = data || {};
+
+            if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+                socket.emit('error', {
+                    event: 'admin:get-user-details',
+                    message: 'Valid userId is required'
+                });
+                return;
+            }
+
+            const user = await User.findById(userId)
+                .select('-__v')
+                .lean();
+
+            if (!user) {
+                socket.emit('error', {
+                    event: 'admin:get-user-details',
+                    message: 'User not found'
+                });
+                return;
+            }
+
+            // Get user's last known location
+            const lastLocation = await Location.findOne({ userID: userId })
+                .sort({ timestamp: -1 })
+                .lean();
+
+            // Get user's recent alerts
+            const recentAlerts = await Alert.find({ userID: userId })
+                .sort({ createdAt: -1 })
+                .limit(10)
+                .lean();
+
+            // Get user's groups
+            const userGroups = await Group.find({
+                'members.userID': userId,
+                isActive: true
+            }).select('name description joinCode members createdAt').lean();
+
+            socket.emit('admin:user-details', {
+                user: {
+                    userId: user._id.toString(),
+                    name: user.name,
+                    email: user.email,
+                    profilePicture: user.profilePicture || null,
+                    phoneNumber: user.phoneNumber || null,
+                    alternativePhoneNumber: user.alternativePhoneNumber || null,
+                    whatsappNumber: user.whatsappNumber || null,
+                    emergencyContacts: user.emergencyContacts || [],
+                    healthInfo: user.healthInfo ? {
+                        bloodGroup: user.healthInfo.bloodGroup || null,
+                        allergies: user.healthInfo.allergies || [],
+                        chronicDiseases: user.healthInfo.chronicDiseases || [],
+                        medications: user.healthInfo.medications || []
+                    } : null,
+                    dateOfBirth: user.dateOfBirth || null,
+                    nationality: user.nationality || null,
+                    gender: user.gender || null,
+                    firebaseUID: user.firebaseUID || null,
+                    clerkID: user.clerkID || null,
+                    providers: user.providers || [],
+                    permissions: user.permissions ? {
+                        allowLocationAccess: user.permissions.allowLocationAccess ?? true,
+                        allowNotificationAccess: user.permissions.allowNotificationAccess ?? true,
+                        allowSmsAccess: user.permissions.allowSmsAccess ?? false
+                    } : null,
+                    lastLogin: user.lastLogin || null,
+                    isVerified: user.isVerified || false,
+                    role: user.role,
+                    isOnline: onlineUsers.has(userId),
+                    connectedAt: onlineUsers.get(userId)?.connectedAt || null,
+                    registeredAt: user.createdAt,
+                    updatedAt: user.updatedAt
+                },
+                lastLocation: lastLocation ? {
+                    latitude: lastLocation.location.coordinates[1],
+                    longitude: lastLocation.location.coordinates[0],
+                    battery: lastLocation.batteryLevel,
+                    speed: lastLocation.speed,
+                    accuracy: lastLocation.accuracy,
+                    timestamp: lastLocation.timestamp
+                } : null,
+                recentAlerts: recentAlerts.map(alert => ({
+                    alertId: alert._id.toString(),
+                    type: alert.alertType,
+                    severity: alert.severity,
+                    status: alert.status,
+                    description: alert.description,
+                    location: alert.location ? {
+                        latitude: alert.location.coordinates[1],
+                        longitude: alert.location.coordinates[0]
+                    } : null,
+                    createdAt: alert.createdAt
+                })),
+                groups: userGroups.map(group => ({
+                    id: group._id.toString(),
+                    name: group.name,
+                    description: group.description,
+                    memberCount: group.members?.length || 0,
+                    role: group.members?.find(m => m.userID?.toString() === userId)?.role || 'member',
+                    createdAt: group.createdAt
+                }))
+            });
+
+        } catch (error) {
+            console.error('Admin get user details error:', error);
+            socket.emit('error', {
+                event: 'admin:get-user-details',
+                message: 'Failed to get user details'
+            });
+        }
+    });
 }
 
 // Helper function to calculate distance between two points in meters (Haversine formula)
