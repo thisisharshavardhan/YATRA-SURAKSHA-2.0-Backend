@@ -7,7 +7,7 @@ import Alert from '../Models/alert.model.js';
 // Gemini Live API Configuration
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-dialog';
-const GEMINI_WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent`;
+const GEMINI_WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent`;
 
 // POI API Configuration (FastAPI + PostGIS for nearby places)
 const POI_API_BASE = process.env.POI_API_URL || 'http://135.235.138.50:8000';
