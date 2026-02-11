@@ -6,7 +6,7 @@ import Alert from '../Models/alert.model.js';
 
 // Gemini Live API Configuration
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-dialog';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-preview-native-audio-dialog';
 const GEMINI_WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent`;
 
 // POI API Configuration (FastAPI + PostGIS for nearby places)
@@ -691,20 +691,31 @@ console.log(`[Gemini] Using model: ${modelName}`);
                 geminiWs.on('open', () => {
                     console.log(`[Gemini] WebSocket connected, sending setup for model: ${modelName}`);
 
+                    // Build generation config based on model type
+                    const isNativeAudioDialog = modelName.includes('native-audio-dialog');
+                    
+                    const generationConfig = isNativeAudioDialog
+                        ? {
+                            // Native audio dialog model handles voice natively
+                            // No speechConfig needed — it has its own built-in voice
+                            responseModalities: ['AUDIO'],
+                        }
+                        : {
+                            responseModalities: ['AUDIO'],
+                            speechConfig: {
+                                voiceConfig: {
+                                    prebuiltVoiceConfig: {
+                                        voiceName: voiceSettings.voice || 'Aoede'
+                                    }
+                                }
+                            }
+                        };
+
                     // Send the setup message (required as first message)
                     const setupMessage = {
                         setup: {
                             model: modelName,
-                            generationConfig: {
-                                responseModalities: ['AUDIO'],
-                                speechConfig: {
-                                    voiceConfig: {
-                                        prebuiltVoiceConfig: {
-                                            voiceName: voiceSettings.voice || 'Aoede'
-                                        }
-                                    }
-                                }
-                            },
+                            generationConfig: generationConfig,
                             systemInstruction: {
                                 parts: [{ text: systemInstructions }]
                             },
@@ -713,7 +724,7 @@ console.log(`[Gemini] Using model: ${modelName}`);
                     };
 
                     geminiWs.send(JSON.stringify(setupMessage));
-                    console.log('[Gemini] Setup message sent:', JSON.stringify({ model: modelName }).slice(0, 200));
+                    console.log('[Gemini] Setup message sent:', JSON.stringify({ model: modelName, isNativeAudioDialog }).slice(0, 300));
                 });
 
                 geminiWs.on('message', (data) => {
