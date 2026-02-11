@@ -241,7 +241,16 @@
         if (!token) { log('Auth token is required!', 'err'); return; }
 
         log('Connecting to socket server...');
-        socket = io(`${url}/user`, { query: { token }, transports: ['websocket', 'polling'], reconnection: true, reconnectionAttempts: 5, timeout: 10000 });
+        log('Token length: ' + token.length + ' chars', 'info');
+
+        socket = io(`${url}/user`, {
+            query: { token },
+            auth: { token },
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionAttempts: 5,
+            timeout: 10000
+        });
 
         socket.on('connect', () => { log('✅ Socket connected (id: ' + socket.id + ')', 'ok'); setSocketUI(true); });
         socket.on('disconnect', (reason) => { log('❌ Socket disconnected: ' + reason, 'err'); setSocketUI(false); });
