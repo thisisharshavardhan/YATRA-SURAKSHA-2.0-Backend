@@ -678,6 +678,9 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
             const wsUrl = `${GEMINI_WS_URL}?key=${GEMINI_API_KEY}`;
             console.log(`[Gemini] Connecting to Gemini Live API with model: ${GEMINI_MODEL}`);
 
+            const modelName = GEMINI_MODEL.startsWith('models/') ? GEMINI_MODEL : `models/${GEMINI_MODEL}`;
+console.log(`[Gemini] Using model: ${modelName}`);
+
             return new Promise((resolve, reject) => {
                 const timeoutId = setTimeout(() => {
                     reject(new Error('Gemini WebSocket connection timed out after 15s'));
@@ -686,12 +689,12 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                 const geminiWs = new WebSocket(wsUrl);
 
                 geminiWs.on('open', () => {
-                    console.log(`[Gemini] WebSocket connected, sending setup for model: ${GEMINI_MODEL}`);
+                    console.log(`[Gemini] WebSocket connected, sending setup for model: ${modelName}`);
 
                     // Send the setup message (required as first message)
                     const setupMessage = {
                         setup: {
-                            model: `models/${GEMINI_MODEL}`,
+                            model: modelName,
                             generationConfig: {
                                 responseModalities: ['AUDIO'],
                                 speechConfig: {
@@ -710,19 +713,51 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                     };
 
                     geminiWs.send(JSON.stringify(setupMessage));
-                    console.log('[Gemini] Setup message sent');
+                    console.log('[Gemini] Setup message sent:', JSON.stringify({ model: modelName }).slice(0, 200));
                 });
 
                 geminiWs.on('message', (data) => {
                     try {
                         const message = JSON.parse(data.toString());
+                        if (process.env.NODE_ENV === 'development') {
+                            console.log('[Gemini] Raw message:', JSON.stringify(message).slice(0, 1000));
+                        }
 
-                        // Handle setup complete - this is the first response after setup
+                        // If server returned an explicit error object
+                        if (message.error) {
+                            clearTimeout(timeoutId);
+                            const errMsg = message.error?.message || JSON.stringify(message.error);
+                            console.error('[Gemini] Setup error received:', errMsg);
+                            socket.emit('gemini:error', {
+                                message: `Gemini setup error: ${errMsg}`,
+                                code: 'SETUP_ERROR',
+                                raw: message.error
+                            });
+                            // Close with policy violation to ensure cleanup
+                            geminiWs.close(1008, errMsg);
+                            reject(new Error(errMsg));
+                            return;
+                        }
+
+                        // Some responses use status codes
+                        if (message.status && typeof message.status.code !== 'undefined' && message.status.code !== 0) {
+                            clearTimeout(timeoutId);
+                            const statusMsg = message.status?.message || `Code ${message.status.code}`;
+                            console.error('[Gemini] Setup status error:', statusMsg);
+                            socket.emit('gemini:error', {
+                                message: `Gemini setup status error: ${statusMsg}`,
+                                code: message.status.code,
+                                raw: message.status
+                            });
+                            geminiWs.close(1008, statusMsg);
+                            reject(new Error(statusMsg));
+                            return;
+                        }
+
+                        // Handle setupComplete
                         if (message.setupComplete !== undefined) {
                             clearTimeout(timeoutId);
                             console.log(`[Gemini] Session setup complete for user: ${user.name}`);
-
-                            // Store session AFTER setup is complete
                             this.sessions.set(userId, {
                                 geminiWs: geminiWs,
                                 clientSocket: socket,
@@ -731,9 +766,7 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                                 pendingToolCalls: new Map(),
                                 createdAt: new Date()
                             });
-
                             socket.emit('gemini:session-created', { sessionId: userId });
-
                             resolve({
                                 success: true,
                                 sessionId: userId,
@@ -742,9 +775,8 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                             return;
                         }
 
-                        // All other messages handled by handleGeminiMessage
+                        // Otherwise pass to normal handler
                         this.handleGeminiMessage(userId, message);
-
                     } catch (error) {
                         console.error('[Gemini] Error parsing message:', error);
                     }
@@ -762,19 +794,35 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
 
                 geminiWs.on('close', (code, reason) => {
                     clearTimeout(timeoutId);
-                    const reasonStr = reason ? reason.toString() : 'unknown';
+                    let reasonStr = '';
+                    try {
+                        reasonStr = reason ? reason.toString() : '';
+                    } catch (e) {
+                        reasonStr = String(reason);
+                    }
                     console.log(`[Gemini] WebSocket closed: code=${code} reason=${reasonStr}`);
+
+                    if (code === 1008) {
+                        // Policy error (likely invalid API key/model or malformed setup) — surface to client
+                        const helpful = 'Gemini rejected the session (1008). Check GEMINI_API_KEY and GEMINI_MODEL values and try again.';
+                        socket.emit('gemini:error', {
+                            message: `Gemini connection rejected: ${reasonStr || 'policy violation'}. ${helpful}`,
+                            code: 1008,
+                            hint: 'Verify GEMINI_API_KEY and GEMINI_MODEL (example: gemini-2.5-flash)',
+                            rawReason: reasonStr
+                        });
+                    } else {
+                        socket.emit('gemini:disconnected', {
+                            success: true,
+                            message: `Gemini session ended (code: ${code})`,
+                            reason: reasonStr
+                        });
+                    }
 
                     // Clean up session
                     if (this.sessions.has(userId)) {
                         this.sessions.delete(userId);
                     }
-
-                    socket.emit('gemini:disconnected', {
-                        success: true,
-                        message: `Gemini session ended (code: ${code})`,
-                        reason: reasonStr
-                    });
                 });
             });
 
