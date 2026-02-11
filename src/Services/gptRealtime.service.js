@@ -34,13 +34,13 @@ class GPTRealtimeService {
             {
                 type: 'function',
                 name: 'get_nearby_hospitals',
-                description: 'Get nearby hospitals based on user\'s current location. Call this when user asks about hospitals, has a medical emergency, or mentions health issues like pain, injury, illness, etc.',
+                description: 'Get nearby hospitals AND clinics based on user\'s current location. Automatically fetches both hospitals and clinics, then filters by relevance to the user\'s condition. Call this when user asks about hospitals, has a medical emergency, or mentions health issues like pain, injury, illness, fever, etc.',
                 parameters: {
                     type: 'object',
                     properties: {
                         condition: {
                             type: 'string',
-                            description: 'The medical condition or issue the user mentioned (e.g., "heart pain", "eye problem", "fracture", "general checkup")'
+                            description: 'The medical condition or issue the user mentioned (e.g., "heart pain", "eye problem", "fracture", "fever", "pregnancy", "child sick", "ear pain", "general checkup")'
                         },
                         limit: {
                             type: 'number',
@@ -106,6 +106,24 @@ class GPTRealtimeService {
                     },
                     required: ['severity']
                 }
+            },
+            {
+                type: 'function',
+                name: 'get_nearest_safe_location',
+                description: 'Find the nearest safe, populated public places where the user can go for safety. This searches for nearby cafes, restaurants, hotels, malls, police stations, fuel stations, bus stations, ATMs, cinemas, and supermarkets - any public place with people around. Call this when user feels unsafe, scared, lost, alone at night, being followed, or asks "where can I go?", "is there a safe place nearby?", "I need to find people", or similar safety concerns.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        reason: {
+                            type: 'string',
+                            description: 'Why the user needs a safe location (e.g., "feeling unsafe", "lost at night", "being followed", "need crowded place")'
+                        },
+                        limit: {
+                            type: 'number',
+                            description: 'Number of safe locations to return (default 5)'
+                        }
+                    }
+                }
             }
         ];
     }
@@ -135,18 +153,20 @@ Address the user by their name: ${user.name}
 
 ## IMPORTANT - USING TOOLS:
 You have access to tools/functions that fetch real-time data. You MUST use these tools when needed:
-- Use "get_nearby_hospitals" when user mentions ANY health issue (pain, injury, sickness, emergency)
+- Use "get_nearby_hospitals" when user mentions ANY health issue (pain, injury, sickness, fever, pregnancy, child sick, etc.). This tool automatically searches BOTH hospitals AND clinics, then filters by relevance to their condition.
 - Use "get_nearby_police" when user feels unsafe, reports crime, or needs police
 - Use "get_nearby_pharmacies" when user needs medicines or medical supplies
 - Use "get_safety_info" when user asks about area safety
 - Use "trigger_sos_alert" ONLY when user explicitly requests emergency help
+- Use "get_nearest_safe_location" when user feels unsafe, scared, lost, alone, being followed, or needs a nearby public/crowded place to go. This finds the closest cafes, restaurants, hotels, malls, police stations, bus stops etc.
 
 ## CRITICAL RULES:
 1. NEVER make up or guess hospital/police/pharmacy names. ALWAYS call the appropriate tool first.
-2. When user mentions health issues, FIRST call get_nearby_hospitals with their condition, THEN respond.
+2. When user mentions health issues, FIRST call get_nearby_hospitals with their condition, THEN respond. The tool will return ONLY relevant hospitals/clinics for that condition.
 3. If a tool returns no data, tell the user: "I couldn't find nearby [facility type] for your location."
 4. For emergencies, suggest calling 112/108 AND use the tool to find nearby hospitals.
 5. Wait for tool results before giving specific facility names.
+6. When user feels unsafe or scared, use get_nearest_safe_location to quickly guide them to the nearest populated public place. Also suggest calling 112 if it's urgent.
 
 ## User Information:
 - Name: ${user.name}
@@ -206,16 +226,19 @@ ${user.gender ? `- Gender: ${user.gender}` : ''}
 
         instructions += `
 ## What You Can Help With:
-1. Find nearby hospitals, police, pharmacies using your tools
-2. Provide safety information about user's current area
-3. Guide users to use the SOS feature for emergencies
-4. Discuss the user's active trips
-5. Provide general safety advice for travelers
+1. Find nearby hospitals & clinics (filtered by medical condition) using your tools
+2. Find the nearest safe, populated public places when user feels unsafe
+3. Provide safety information about user's current area
+4. Guide users to use the SOS feature for emergencies
+5. Find nearby police stations and pharmacies
+6. Discuss the user's active trips
+7. Provide general safety advice for travelers
 
 ## EMOTIONAL RESPONSE EXAMPLES:
 - Health emergency: "Oh no, ${user.name}! Let me quickly find you a hospital. [use tool] Stay calm, help is near!"
 - General question: "Sure thing! Let me check that for you real quick."
-- Safety concern: "I understand you're worried. Let me help you feel safer."
+- Safety concern: "I understand you're worried. Let me find you a safe place nearby right now! [use get_nearest_safe_location]"
+- Feeling unsafe at night: "Don't worry, ${user.name}! Let me find the nearest open, populated place for you. [use get_nearest_safe_location]"
 - Good news: "Great news! There's a hospital just 500 meters away."
 - SOS situation: "I'm triggering an SOS alert right now. Your contacts will be notified immediately. Stay on the line with me."
 
@@ -293,6 +316,47 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
     }
 
     /**
+     * Get nearby POIs of multiple types in parallel and merge results sorted by distance
+     * @param {number} latitude
+     * @param {number} longitude
+     * @param {string[]} types - Array of POI types to fetch
+     * @param {number} limitPerType - Number of results per type (default 2)
+     * @returns {Promise<Array>} Merged array sorted by distance_m
+     */
+    async getNearbyMultiplePOIs(latitude, longitude, types = [], limitPerType = 2) {
+        try {
+            console.log(`[POI] Fetching multiple types: [${types.join(', ')}] for: ${latitude}, ${longitude}`);
+
+            // Fetch all types in parallel
+            const results = await Promise.allSettled(
+                types.map(type => this.getNearbyPOIs(latitude, longitude, type, limitPerType))
+            );
+
+            // Merge all successful results with their type
+            const merged = [];
+            results.forEach((result, index) => {
+                if (result.status === 'fulfilled' && result.value.length > 0) {
+                    result.value.forEach(poi => {
+                        merged.push({
+                            ...poi,
+                            type: types[index]
+                        });
+                    });
+                }
+            });
+
+            // Sort by distance (closest first)
+            merged.sort((a, b) => (a.distance_m || Infinity) - (b.distance_m || Infinity));
+
+            console.log(`[POI] Multi-type merged: ${merged.length} results`);
+            return merged;
+        } catch (error) {
+            console.error('[POI] Error fetching multiple POIs:', error);
+            return [];
+        }
+    }
+
+    /**
      * Handle tool/function calls from the AI
      */
     async handleToolCall(userId, toolName, toolArgs) {
@@ -310,68 +374,101 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                 const { latitude, longitude } = currentLocation;
                 const condition = toolArgs.condition || 'general';
                 const limit = toolArgs.limit || 7; // Get more to filter
-                
-                const hospitals = await this.getNearbyPOIs(latitude, longitude, 'hospital', limit);
-                
-                if (hospitals.length === 0) {
-                    return { 
+
+                // Fetch BOTH hospitals and clinics in parallel for better coverage
+                const [hospitals, clinics] = await Promise.all([
+                    this.getNearbyPOIs(latitude, longitude, 'hospital', limit),
+                    this.getNearbyPOIs(latitude, longitude, 'clinic', Math.ceil(limit / 2))
+                ]);
+
+                // Merge and tag source type
+                const allFacilities = [
+                    ...hospitals.map(h => ({ ...h, facilityType: 'hospital' })),
+                    ...clinics.map(c => ({ ...c, facilityType: 'clinic' }))
+                ];
+
+                if (allFacilities.length === 0) {
+                    return {
                         hospitals: [],
-                        message: 'No hospitals found nearby. Recommend calling 108 for ambulance.'
+                        message: 'No hospitals or clinics found nearby. Recommend calling 108 for ambulance.'
                     };
                 }
 
-                // Filter hospitals based on condition
+                // Condition-based categorization with relevance keywords
                 const conditionLower = condition.toLowerCase();
-                let filteredHospitals = hospitals;
+                const conditionCategories = [
+                    { name: 'critical_emergency', pattern: /heart|chest|breath|stroke|accident|head|critical|emergency|severe|unconscious|bleeding|seizure|poison|burn/, excludeKeywords: ['eye', 'dental', 'skin', 'derma', 'maternity', 'child', 'vet', 'animal', 'ayurved', 'homeo'], recommendation: 'URGENT: Call 108/112 for ambulance. Recommending general/multi-specialty hospitals.', preferHospitals: true },
+                    { name: 'eye', pattern: /eye|vision|blind|cataract/, includeKeywords: ['eye', 'ophthal', 'vision', 'nethra'], recommendation: 'Recommending eye specialists.' },
+                    { name: 'bone', pattern: /bone|fracture|ortho|joint|spine|back pain|knee|shoulder/, includeKeywords: ['ortho', 'bone', 'joint', 'spine'], recommendation: 'Recommending orthopedic hospitals.' },
+                    { name: 'dental', pattern: /tooth|dental|teeth|gum|jaw/, includeKeywords: ['dental', 'tooth', 'teeth', 'dent'], recommendation: 'Recommending dental clinics.' },
+                    { name: 'skin', pattern: /skin|rash|derma|allergy|itch|acne|eczema/, includeKeywords: ['skin', 'derma', 'derm'], recommendation: 'Recommending dermatology clinics.' },
+                    { name: 'ent', pattern: /ear|nose|throat|sinus|hearing|tonsil/, includeKeywords: ['ent', 'ear', 'nose', 'throat'], recommendation: 'Recommending ENT specialists.' },
+                    { name: 'gynecology', pattern: /pregnan|period|menstr|gynec|women|ovary|uterus|pcos|delivery|labor/, includeKeywords: ['gynec', 'obst', 'maternity', 'women', 'mother'], recommendation: 'Recommending gynecology/maternity hospitals.' },
+                    { name: 'pediatric', pattern: /child|kid|baby|infant|toddler|pediatr|neonat/, includeKeywords: ['child', 'pediatr', 'kids', 'baby', 'neonat'], recommendation: 'Recommending pediatric/children\'s hospitals.' },
+                    { name: 'mental_health', pattern: /depress|anxiety|mental|stress|panic|suicid|psychiatr|psycholog/, includeKeywords: ['mental', 'psych', 'mind', 'neuro'], recommendation: 'Recommending mental health facilities. If in crisis, call iCall helpline: 9152987821.' },
+                    { name: 'general', pattern: /fever|cold|cough|flu|infection|vomit|diarr|stomach|abdomen|headache|weakness|fatigue|check.?up|general|sick|unwell/, excludeKeywords: ['eye', 'dental', 'skin', 'derma', 'vet', 'animal', 'ayurved', 'homeo'], recommendation: 'Recommending nearest general hospitals and clinics.' }
+                ];
+
+                let filteredFacilities = allFacilities;
                 let recommendation = '';
+                let matchedCategory = null;
 
-                // Determine what type of hospital is needed
-                const isSerious = /heart|chest|breath|stroke|accident|head|critical|emergency|severe|unconscious/.test(conditionLower);
-                const isEye = /eye|vision|blind/.test(conditionLower);
-                const isBone = /bone|fracture|ortho|joint|spine/.test(conditionLower);
-                const isDental = /tooth|dental|teeth/.test(conditionLower);
-                const isSkin = /skin|rash|derma/.test(conditionLower);
-
-                if (isSerious) {
-                    // Filter OUT specialized hospitals for serious emergencies
-                    filteredHospitals = hospitals.filter(h => {
-                        const name = h.name.toLowerCase();
-                        return !name.includes('eye') && !name.includes('dental') && 
-                               !name.includes('skin') && !name.includes('derma') &&
-                               !name.includes('maternity') && !name.includes('child');
-                    });
-                    recommendation = 'URGENT: Call 108/112 for ambulance. Recommending general/multi-specialty hospitals.';
-                } else if (isEye) {
-                    const eyeHospitals = hospitals.filter(h => h.name.toLowerCase().includes('eye'));
-                    if (eyeHospitals.length > 0) filteredHospitals = eyeHospitals;
-                    recommendation = 'Recommending eye specialists.';
-                } else if (isBone) {
-                    const orthoHospitals = hospitals.filter(h => h.name.toLowerCase().includes('ortho'));
-                    if (orthoHospitals.length > 0) filteredHospitals = orthoHospitals;
-                    recommendation = 'Recommending orthopedic hospitals.';
-                } else if (isDental) {
-                    const dentalHospitals = hospitals.filter(h => h.name.toLowerCase().includes('dental'));
-                    if (dentalHospitals.length > 0) filteredHospitals = dentalHospitals;
-                    recommendation = 'Recommending dental clinics.';
-                } else if (isSkin) {
-                    const skinHospitals = hospitals.filter(h => 
-                        h.name.toLowerCase().includes('skin') || h.name.toLowerCase().includes('derma')
-                    );
-                    if (skinHospitals.length > 0) filteredHospitals = skinHospitals;
-                    recommendation = 'Recommending dermatology clinics.';
+                // Find the matching condition category
+                for (const category of conditionCategories) {
+                    if (category.pattern.test(conditionLower)) {
+                        matchedCategory = category;
+                        break;
+                    }
                 }
 
-                // If filtering left no results, use original list
-                if (filteredHospitals.length === 0) {
-                    filteredHospitals = hospitals;
-                    recommendation = 'Showing nearest hospitals.';
+                if (matchedCategory) {
+                    recommendation = matchedCategory.recommendation;
+
+                    if (matchedCategory.excludeKeywords) {
+                        // For serious/general conditions: EXCLUDE specialized facilities
+                        filteredFacilities = allFacilities.filter(h => {
+                            const name = h.name.toLowerCase();
+                            return !matchedCategory.excludeKeywords.some(kw => name.includes(kw));
+                        });
+                        // For critical emergencies, prefer hospitals over clinics
+                        if (matchedCategory.preferHospitals && filteredFacilities.length > 3) {
+                            const hospitalOnly = filteredFacilities.filter(f => f.facilityType === 'hospital');
+                            if (hospitalOnly.length >= 2) filteredFacilities = hospitalOnly;
+                        }
+                    } else if (matchedCategory.includeKeywords) {
+                        // For specialized conditions: PREFER matching specialists
+                        const specialists = allFacilities.filter(h => {
+                            const name = h.name.toLowerCase();
+                            return matchedCategory.includeKeywords.some(kw => name.includes(kw));
+                        });
+                        if (specialists.length > 0) {
+                            filteredFacilities = specialists;
+                        }
+                        // If no specialists found, keep all but note it
+                        if (specialists.length === 0) {
+                            recommendation += ' No specialists found nearby, showing nearest general facilities.';
+                        }
+                    }
+                } else {
+                    recommendation = 'Showing nearest hospitals and clinics.';
                 }
+
+                // If filtering left no results, fall back to full list
+                if (filteredFacilities.length === 0) {
+                    filteredFacilities = allFacilities;
+                    recommendation = 'Showing nearest hospitals and clinics.';
+                }
+
+                // Sort by distance and return top results
+                filteredFacilities.sort((a, b) => (a.distance_m || Infinity) - (b.distance_m || Infinity));
 
                 return {
                     condition: condition,
+                    matched_category: matchedCategory?.name || 'general',
                     recommendation: recommendation,
-                    hospitals: filteredHospitals.slice(0, 3).map(h => ({
+                    hospitals: filteredFacilities.slice(0, toolArgs.limit || 3).map(h => ({
                         name: h.name,
+                        type: h.facilityType,
                         distance: h.distance
                     })),
                     emergency_numbers: {
@@ -477,6 +574,78 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                         'Your location has been shared',
                         'Call 112 for immediate assistance'
                     ]
+                };
+            }
+
+            case 'get_nearest_safe_location': {
+                if (!currentLocation) {
+                    return { error: 'Location not available. Ask user to enable location sharing.' };
+                }
+                const { latitude, longitude } = currentLocation;
+                const reason = toolArgs.reason || 'feeling unsafe';
+                const limit = toolArgs.limit || 5;
+
+                // Fetch multiple public/populated place types in parallel
+                const safeLocationTypes = [
+                    'police',       // Most authoritative safe spot
+                    'hotel',        // Usually well-lit, staffed 24/7
+                    'fuel',         // Gas stations - open late, have people
+                    'restaurant',   // Public, populated
+                    'cafe',         // Public, populated
+                    'mall',         // Very populated during hours
+                    'supermarket',  // Public, staffed
+                    'atm',          // Well-lit, usually has CCTV
+                    'bus_station',  // Transit hub with people
+                    'cinema',       // Populated public venue
+                    'hospital',     // Always open, safe
+                    'fire_station'  // Emergency services
+                ];
+
+                const allPlaces = await this.getNearbyMultiplePOIs(
+                    latitude, longitude, safeLocationTypes, 2
+                );
+
+                if (allPlaces.length === 0) {
+                    return {
+                        safe_locations: [],
+                        message: 'Could not find nearby public places. Please call 112 (National Emergency) immediately.',
+                        emergency_number: '112'
+                    };
+                }
+
+                // Build friendly type labels
+                const typeLabels = {
+                    police: '🚔 Police Station',
+                    hotel: '🏨 Hotel',
+                    fuel: '⛽ Fuel Station',
+                    restaurant: '🍽️ Restaurant',
+                    cafe: '☕ Cafe',
+                    mall: '🛍️ Mall',
+                    supermarket: '🛒 Supermarket',
+                    atm: '🏧 ATM',
+                    bus_station: '🚌 Bus Station',
+                    cinema: '🎬 Cinema',
+                    hospital: '🏥 Hospital',
+                    fire_station: '🚒 Fire Station'
+                };
+
+                return {
+                    reason: reason,
+                    message: `Found ${Math.min(allPlaces.length, limit)} nearby public places where you can go for safety.`,
+                    safe_locations: allPlaces.slice(0, limit).map(place => ({
+                        name: place.name,
+                        type: typeLabels[place.type] || place.type,
+                        distance: place.distance,
+                        distance_m: place.distance_m
+                    })),
+                    advice: [
+                        'Head to the nearest well-lit, populated place',
+                        'Stay where other people are around',
+                        'If being followed, go directly to the nearest police station',
+                        'Call 112 if you feel in immediate danger',
+                        'Share your live location with a trusted contact'
+                    ],
+                    emergency_number: '112'
                 };
             }
 
