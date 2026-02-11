@@ -559,6 +559,15 @@
 
             <div id="errorMessage" class="error-message"></div>
 
+            <div id="secureContextWarning" class="error-message" style="display:none; background: rgba(255,152,0,0.2); border-color: #ff9800; color: #ffcc80;">
+                ⚠️ <strong>Microphone unavailable:</strong> Your browser blocks mic access on plain HTTP.<br>
+                <strong>Fix options:</strong><br>
+                1. Access via <code>http://localhost:3000</code> (use SSH tunnel: <code>ssh -L 3000:98.70.26.155:3000 user@98.70.26.155</code>)<br>
+                2. In Chrome, go to <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>, add <code>http://98.70.26.155:3000</code>, and relaunch.<br>
+                3. Enable HTTPS on your server.<br>
+                <em>You can still use the text input below to chat with the AI.</em>
+            </div>
+
             <div class="status-panel">
                 <div class="status-item">
                     <div id="socketStatus" class="status-indicator"></div>
@@ -594,9 +603,7 @@
             <div class="audio-visualizer" id="visualizer"></div>
 
             <div class="voice-button-container">
-                <button id="voiceBtn" class="voice-button" disabled 
-                    onmousedown="startRecording()" onmouseup="stopRecording()"
-                    ontouchstart="startRecording()" ontouchend="stopRecording()">
+                <button id="voiceBtn" class="voice-button" disabled>
                     <svg viewBox="0 0 24 24">
                         <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
                     </svg>
@@ -657,6 +664,37 @@
             }
         }
         initVisualizer();
+
+        // Check for secure context (microphone requires HTTPS or localhost)
+        if (!window.isSecureContext) {
+            document.getElementById('secureContextWarning').style.display = 'block';
+            console.warn('Page is not in a secure context. Microphone will not work. Use HTTPS or localhost.');
+        }
+
+        // Attach hold-to-speak events properly (handles both mouse and touch)
+        voiceBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startRecording();
+        });
+        voiceBtn.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            stopRecording();
+        });
+        voiceBtn.addEventListener('mouseleave', (e) => {
+            // Stop if user drags pointer away while holding
+            stopRecording();
+        });
+        voiceBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent ghost mouse events on mobile
+            startRecording();
+        });
+        voiceBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            stopRecording();
+        });
+        voiceBtn.addEventListener('touchcancel', (e) => {
+            stopRecording();
+        });
 
         // Voice descriptions for the preview
         const voiceDescriptions = {
@@ -991,12 +1029,31 @@
             source.start();
         }
 
+        // Polyfill for getUserMedia (handles HTTP / legacy browsers)
+        function getUserMediaCompat(constraints) {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                return navigator.mediaDevices.getUserMedia(constraints);
+            }
+            // Fallback for older browsers
+            const legacyGetUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+            if (legacyGetUserMedia) {
+                return new Promise((resolve, reject) => {
+                    legacyGetUserMedia.call(navigator, constraints, resolve, reject);
+                });
+            }
+            return Promise.reject(new Error(
+                window.isSecureContext === false
+                    ? 'Microphone access requires HTTPS. Please use https:// or localhost.'
+                    : 'Your browser does not support microphone access.'
+            ));
+        }
+
         // Recording
         async function startRecording() {
             if (!socket || voiceBtn.disabled) return;
 
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
+                const stream = await getUserMediaCompat({
                     audio: { channelCount: 1, sampleRate: 24000, echoCancellation: true, noiseSuppression: true }
                 });
 
@@ -1034,7 +1091,12 @@
 
             } catch (error) {
                 console.error('Error accessing microphone:', error);
-                showError('Could not access microphone.');
+                if (!window.isSecureContext) {
+                    document.getElementById('secureContextWarning').style.display = 'block';
+                    showError('Microphone blocked: page is not served over HTTPS or localhost. Use text input instead.');
+                } else {
+                    showError('Could not access microphone. Please allow microphone permission in your browser.');
+                }
             }
         }
 
