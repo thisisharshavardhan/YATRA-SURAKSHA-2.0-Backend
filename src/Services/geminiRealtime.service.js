@@ -23,7 +23,7 @@ if (!GEMINI_API_KEY) {
  */
 class GeminiRealtimeService {
     constructor() {
-        this.sessions = new Map(); // userId -> { ws, context }
+        this.sessions = new Map(); // userId -> { geminiWs, clientSocket, user, currentLocation, ... }
     }
 
     /**
@@ -190,10 +190,9 @@ ${user.gender ? `- Gender: ${user.gender}` : ''}
             if (user.healthInfo.medications?.length) instructions += `- Current Medications: ${user.healthInfo.medications.join(', ')}\n`;
         }
 
-        // Get current location context (basic info only, POIs fetched on-demand)
+        // Get current location context
         if (currentLocation) {
             const { longitude, latitude } = currentLocation;
-
             instructions += `\n## Current Location:
 - Coordinates: ${latitude}, ${longitude}
 - Location data is available. You can use tools to get nearby facilities when needed.
@@ -366,13 +365,11 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                 const condition = toolArgs.condition || 'general';
                 const limit = toolArgs.limit || 7;
 
-                // Fetch BOTH hospitals and clinics in parallel for better coverage
                 const [hospitals, clinics] = await Promise.all([
                     this.getNearbyPOIs(latitude, longitude, 'hospital', limit),
                     this.getNearbyPOIs(latitude, longitude, 'clinic', Math.ceil(limit / 2))
                 ]);
 
-                // Merge and tag source type
                 const allFacilities = [
                     ...hospitals.map(h => ({ ...h, facilityType: 'hospital' })),
                     ...clinics.map(c => ({ ...c, facilityType: 'clinic' }))
@@ -385,7 +382,6 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                     };
                 }
 
-                // Condition-based categorization with relevance keywords
                 const conditionLower = condition.toLowerCase();
                 const conditionCategories = [
                     { name: 'critical_emergency', pattern: /heart|chest|breath|stroke|accident|head|critical|emergency|severe|unconscious|bleeding|seizure|poison|burn/, excludeKeywords: ['eye', 'dental', 'skin', 'derma', 'maternity', 'child', 'vet', 'animal', 'ayurved', 'homeo'], recommendation: 'URGENT: Call 108/112 for ambulance. Recommending general/multi-specialty hospitals.', preferHospitals: true },
@@ -468,9 +464,7 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                 }
                 const { latitude, longitude } = currentLocation;
                 const limit = toolArgs.limit || 3;
-
                 const police = await this.getNearbyPOIs(latitude, longitude, 'police', limit);
-
                 return {
                     police_stations: police.map(p => ({
                         name: p.name,
@@ -486,9 +480,7 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                 }
                 const { latitude, longitude } = currentLocation;
                 const limit = toolArgs.limit || 3;
-
                 const pharmacies = await this.getNearbyPOIs(latitude, longitude, 'pharmacy', limit);
-
                 return {
                     pharmacies: pharmacies.map(p => ({
                         name: p.name,
@@ -503,11 +495,9 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                 }
                 const { latitude, longitude } = currentLocation;
                 const safetyInfo = await this.getNearbySafetyInfo(longitude, latitude);
-
                 if (!safetyInfo) {
                     return { message: 'Safety data not available for this location.' };
                 }
-
                 return {
                     area_name: safetyInfo.name,
                     safety_score: `${safetyInfo.safetyScore}/100`,
@@ -524,7 +514,6 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                 if (!currentLocation) {
                     return { error: 'Location not available. Cannot trigger SOS without location.' };
                 }
-
                 const alertData = {
                     userID: user._id,
                     location: {
@@ -536,13 +525,10 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                     description: toolArgs.description || 'SOS Alert Triggered via Gemini Voice Assistant',
                     status: 'active'
                 };
-
-                // Emit SOS event to client socket for handling
                 session.clientSocket.emit('gemini:sos-triggered', {
                     alertData,
                     timestamp: new Date()
                 });
-
                 return {
                     status: 'SOS alert triggered',
                     severity: alertData.severity,
@@ -566,26 +552,14 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                 const { latitude, longitude } = currentLocation;
                 const reason = toolArgs.reason || 'feeling unsafe';
                 const limit = toolArgs.limit || 5;
-
                 const safeLocationTypes = [
-                    'police',
-                    'hotel',
-                    'fuel',
-                    'restaurant',
-                    'cafe',
-                    'mall',
-                    'supermarket',
-                    'atm',
-                    'bus_station',
-                    'cinema',
-                    'hospital',
-                    'fire_station'
+                    'police', 'hotel', 'fuel', 'restaurant', 'cafe',
+                    'mall', 'supermarket', 'atm', 'bus_station', 'cinema',
+                    'hospital', 'fire_station'
                 ];
-
                 const allPlaces = await this.getNearbyMultiplePOIs(
                     latitude, longitude, safeLocationTypes, 2
                 );
-
                 if (allPlaces.length === 0) {
                     return {
                         safe_locations: [],
@@ -593,22 +567,12 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                         emergency_number: '112'
                     };
                 }
-
                 const typeLabels = {
-                    police: '🚔 Police Station',
-                    hotel: '🏨 Hotel',
-                    fuel: '⛽ Fuel Station',
-                    restaurant: '🍽️ Restaurant',
-                    cafe: '☕ Cafe',
-                    mall: '🛍️ Mall',
-                    supermarket: '🛒 Supermarket',
-                    atm: '🏧 ATM',
-                    bus_station: '🚌 Bus Station',
-                    cinema: '🎬 Cinema',
-                    hospital: '🏥 Hospital',
-                    fire_station: '🚒 Fire Station'
+                    police: '🚔 Police Station', hotel: '🏨 Hotel', fuel: '⛽ Fuel Station',
+                    restaurant: '🍽️ Restaurant', cafe: '☕ Cafe', mall: '🛍️ Mall',
+                    supermarket: '🛒 Supermarket', atm: '🏧 ATM', bus_station: '🚌 Bus Station',
+                    cinema: '🎬 Cinema', hospital: '🏥 Hospital', fire_station: '🚒 Fire Station'
                 };
-
                 return {
                     reason: reason,
                     message: `Found ${Math.min(allPlaces.length, limit)} nearby public places where you can go for safety.`,
@@ -670,7 +634,6 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
         try {
             const location = await Location.findOne({ userID: userId })
                 .sort({ timestamp: -1 });
-
             if (location) {
                 return {
                     longitude: location.location.coordinates[0],
@@ -686,11 +649,8 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
     }
 
     /**
-     * Create a new Gemini Live session for a user
-     * @param {Object} user - User object
-     * @param {Object} clientSocket - Socket.IO client socket
-     * @param {Object} currentLocation - { longitude, latitude }
-     * @param {Object} voiceSettings - { temperature, silence_duration_ms }
+     * Create a new Gemini Live session for a user via WebSocket
+     * Uses the Gemini Live API (BidiGenerateContent) over WebSocket
      */
     async createSession(user, socket, currentLocation = null, voiceSettings = {}) {
         try {
@@ -702,6 +662,10 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
             const userId = user._id.toString();
             console.log(`[Gemini] Creating session for user: ${userId}`);
 
+            if (!GEMINI_API_KEY) {
+                throw new Error('GEMINI_API_KEY not found in environment variables');
+            }
+
             // Get location if not provided
             if (!currentLocation) {
                 currentLocation = await this.getLastLocation(userId);
@@ -710,59 +674,109 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
             // Build system instructions
             const systemInstructions = await this.buildSystemInstructions(user, currentLocation);
 
-            // Initialize Gemini Live API client
-            console.log('[Gemini] Initializing Gemini Live API...');
-            
-            // **FIX: Check if API key exists**
-            if (!process.env.GEMINI_API_KEY) {
-                throw new Error('GEMINI_API_KEY not found in environment variables');
-            }
+            // Build the WebSocket URL with API key and model
+            const wsUrl = `${GEMINI_WS_URL}?key=${GEMINI_API_KEY}`;
+            console.log(`[Gemini] Connecting to Gemini Live API with model: ${GEMINI_MODEL}`);
 
-            const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-dialog';
-            
-            // Initialize the Gemini client with correct configuration
-            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-            
-            // **FIX: Use correct Live API initialization**
-            const geminiModel = genAI.getGenerativeModel({
-                model: model,
-                systemInstruction: systemInstructions,
-                tools: this.getAvailableTools(),
-                generationConfig: {
-                    temperature: 0.7,
-                    candidateCount: 1,
-                }
+            return new Promise((resolve, reject) => {
+                const timeoutId = setTimeout(() => {
+                    reject(new Error('Gemini WebSocket connection timed out after 15s'));
+                }, 15000);
+
+                const geminiWs = new WebSocket(wsUrl);
+
+                geminiWs.on('open', () => {
+                    console.log(`[Gemini] WebSocket connected, sending setup for model: ${GEMINI_MODEL}`);
+
+                    // Send the setup message (required as first message)
+                    const setupMessage = {
+                        setup: {
+                            model: `models/${GEMINI_MODEL}`,
+                            generationConfig: {
+                                responseModalities: ['AUDIO'],
+                                speechConfig: {
+                                    voiceConfig: {
+                                        prebuiltVoiceConfig: {
+                                            voiceName: voiceSettings.voice || 'Aoede'
+                                        }
+                                    }
+                                }
+                            },
+                            systemInstruction: {
+                                parts: [{ text: systemInstructions }]
+                            },
+                            tools: this.getAvailableTools()
+                        }
+                    };
+
+                    geminiWs.send(JSON.stringify(setupMessage));
+                    console.log('[Gemini] Setup message sent');
+                });
+
+                geminiWs.on('message', (data) => {
+                    try {
+                        const message = JSON.parse(data.toString());
+
+                        // Handle setup complete - this is the first response after setup
+                        if (message.setupComplete !== undefined) {
+                            clearTimeout(timeoutId);
+                            console.log(`[Gemini] Session setup complete for user: ${user.name}`);
+
+                            // Store session AFTER setup is complete
+                            this.sessions.set(userId, {
+                                geminiWs: geminiWs,
+                                clientSocket: socket,
+                                user: user,
+                                currentLocation: currentLocation,
+                                pendingToolCalls: new Map(),
+                                createdAt: new Date()
+                            });
+
+                            socket.emit('gemini:session-created', { sessionId: userId });
+
+                            resolve({
+                                success: true,
+                                sessionId: userId,
+                                message: 'Gemini session created successfully'
+                            });
+                            return;
+                        }
+
+                        // All other messages handled by handleGeminiMessage
+                        this.handleGeminiMessage(userId, message);
+
+                    } catch (error) {
+                        console.error('[Gemini] Error parsing message:', error);
+                    }
+                });
+
+                geminiWs.on('error', (error) => {
+                    clearTimeout(timeoutId);
+                    console.error('[Gemini] WebSocket error:', error.message);
+                    socket.emit('gemini:error', {
+                        message: `Gemini connection error: ${error.message}`,
+                        code: 'WS_ERROR'
+                    });
+                    reject(error);
+                });
+
+                geminiWs.on('close', (code, reason) => {
+                    clearTimeout(timeoutId);
+                    const reasonStr = reason ? reason.toString() : 'unknown';
+                    console.log(`[Gemini] WebSocket closed: code=${code} reason=${reasonStr}`);
+
+                    // Clean up session
+                    if (this.sessions.has(userId)) {
+                        this.sessions.delete(userId);
+                    }
+
+                    socket.emit('gemini:disconnected', {
+                        success: true,
+                        message: `Gemini session ended (code: ${code})`,
+                        reason: reasonStr
+                    });
+                });
             });
-
-            // Create live session
-            const liveSession = await geminiModel.startChat({
-                generationConfig: {
-                    responseModalities: ['AUDIO', 'TEXT'],
-                },
-            });
-
-            console.log('[Gemini] Live session created successfully');
-
-            // Store session
-            this.sessions.set(userId, {
-                liveSession: liveSession,
-                clientSocket: socket,
-                user: user,
-                currentLocation: currentLocation,
-                createdAt: new Date()
-            });
-
-            // Emit success to client
-            socket.emit('gemini:session-created', {
-                sessionId: userId,
-                model: model
-            });
-
-            return {
-                success: true,
-                sessionId: userId,
-                message: 'Gemini session created successfully'
-            };
 
         } catch (error) {
             console.error('[Gemini] Error creating session:', error);
@@ -771,23 +785,13 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
     }
 
     /**
-     * Handle messages from Gemini Live API
+     * Handle messages from Gemini Live API WebSocket
      */
-    handleGeminiMessage(userId, message, resolveSetup = null) {
+    handleGeminiMessage(userId, message) {
         const session = this.sessions.get(userId);
         if (!session) return;
 
         const { clientSocket } = session;
-
-        // Handle setupComplete
-        if (message.setupComplete !== undefined) {
-            console.log(`[Gemini] Session setup complete for user: ${session.user.name}`);
-            clientSocket.emit('gemini:session-created', { sessionId: userId });
-            if (resolveSetup) {
-                resolveSetup({ success: true, message: 'Session created successfully' });
-            }
-            return;
-        }
 
         // Handle serverContent (audio, text, transcriptions)
         if (message.serverContent) {
@@ -809,14 +813,14 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                 }
             }
 
-            // Input transcription
+            // Input transcription (what user said)
             if (serverContent.inputTranscription) {
                 clientSocket.emit('gemini:user-transcript', {
                     transcript: serverContent.inputTranscription.text
                 });
             }
 
-            // Output transcription
+            // Output transcription (what AI said in text form)
             if (serverContent.outputTranscription) {
                 clientSocket.emit('gemini:transcript-delta', {
                     delta: serverContent.outputTranscription.text
@@ -829,7 +833,7 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
                 clientSocket.emit('gemini:transcript-done', { transcript: '' });
             }
 
-            // Interrupted
+            // Interrupted (user started speaking while AI was responding)
             if (serverContent.interrupted) {
                 clientSocket.emit('gemini:speech-started');
             }
@@ -864,7 +868,7 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
             return;
         }
 
-        // Log unhandled messages in dev
+        // Log unhandled messages
         if (process.env.NODE_ENV === 'development') {
             console.log('[Gemini] Unhandled message type:', Object.keys(message));
         }
@@ -907,12 +911,13 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
         }
 
         // Send all function responses back to Gemini
-        if (geminiWs.readyState === WebSocket.OPEN) {
+        if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
             geminiWs.send(JSON.stringify({
                 toolResponse: {
                     functionResponses: functionResponses
                 }
             }));
+            console.log(`[Gemini] Sent ${functionResponses.length} function response(s) back to Gemini`);
         }
     }
 
@@ -922,16 +927,16 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
      */
     sendAudio(userId, audioBase64) {
         const session = this.sessions.get(userId);
-        if (!session || session.geminiWs.readyState !== WebSocket.OPEN) {
+        if (!session || !session.geminiWs || session.geminiWs.readyState !== WebSocket.OPEN) {
             return { success: false, message: 'No active session' };
         }
 
         session.geminiWs.send(JSON.stringify({
             realtimeInput: {
-                audio: {
+                mediaChunks: [{
                     data: audioBase64,
                     mimeType: 'audio/pcm;rate=16000'
-                }
+                }]
             }
         }));
 
@@ -940,16 +945,14 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
 
     /**
      * Commit audio buffer (signal end of speech)
-     * With Gemini Live API + VAD, this sends an activityEnd signal
      */
     commitAudio(userId) {
         const session = this.sessions.get(userId);
-        if (!session || session.geminiWs.readyState !== WebSocket.OPEN) {
+        if (!session || !session.geminiWs || session.geminiWs.readyState !== WebSocket.OPEN) {
             return { success: false, message: 'No active session' };
         }
 
-        // With automatic activity detection, Gemini handles end-of-speech.
-        // But we can signal audioStreamEnd to force processing.
+        // Signal end of audio stream to force processing
         session.geminiWs.send(JSON.stringify({
             realtimeInput: {
                 audioStreamEnd: true
@@ -964,7 +967,7 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
      */
     sendText(userId, text) {
         const session = this.sessions.get(userId);
-        if (!session || session.geminiWs.readyState !== WebSocket.OPEN) {
+        if (!session || !session.geminiWs || session.geminiWs.readyState !== WebSocket.OPEN) {
             return { success: false, message: 'No active session' };
         }
 
@@ -997,7 +1000,7 @@ Remember: Use your tools to fetch real-time data. Never make up facility names.`
         const safetyInfo = await this.getNearbySafetyInfo(longitude, latitude);
 
         // Send location update as context to Gemini
-        if (session.geminiWs.readyState === WebSocket.OPEN) {
+        if (session.geminiWs && session.geminiWs.readyState === WebSocket.OPEN) {
             let locationContext = `[System Update: User's location changed. 
 New coordinates: ${latitude}, ${longitude}`;
 
@@ -1031,7 +1034,7 @@ Note: Use your tools (get_nearby_hospitals, get_nearby_police, get_nearby_pharma
     async closeSession(userId) {
         const session = this.sessions.get(userId);
         if (session) {
-            if (session.geminiWs.readyState === WebSocket.OPEN) {
+            if (session.geminiWs && session.geminiWs.readyState === WebSocket.OPEN) {
                 session.geminiWs.close();
             }
             this.sessions.delete(userId);
@@ -1045,7 +1048,7 @@ Note: Use your tools (get_nearby_hospitals, get_nearby_police, get_nearby_pharma
      */
     hasActiveSession(userId) {
         const session = this.sessions.get(userId);
-        return session && session.geminiWs.readyState === WebSocket.OPEN;
+        return session && session.geminiWs && session.geminiWs.readyState === WebSocket.OPEN;
     }
 
     /**
@@ -1060,7 +1063,7 @@ Note: Use your tools (get_nearby_hospitals, get_nearby_police, get_nearby_pharma
             userName: session.user.name,
             currentLocation: session.currentLocation,
             createdAt: session.createdAt,
-            isActive: session.geminiWs.readyState === WebSocket.OPEN
+            isActive: session.geminiWs && session.geminiWs.readyState === WebSocket.OPEN
         };
     }
 

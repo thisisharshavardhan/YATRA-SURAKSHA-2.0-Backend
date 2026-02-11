@@ -6,12 +6,7 @@
     <title>Gemini Voice Assistant Test</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -21,7 +16,6 @@
             align-items: center;
             padding: 20px;
         }
-
         .container {
             background: white;
             border-radius: 20px;
@@ -30,896 +24,410 @@
             max-width: 900px;
             width: 100%;
         }
-
-        h1 {
-            text-align: center;
-            color: #667eea;
-            margin-bottom: 10px;
-            font-size: 2.5em;
-        }
-
-        .subtitle {
-            text-align: center;
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 1.1em;
-        }
-
+        h1 { text-align: center; color: #667eea; margin-bottom: 10px; font-size: 2.2em; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 1.1em; }
         .status-bar {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            border-left: 4px solid #667eea;
+            display: flex; justify-content: space-between; margin-bottom: 20px;
+            padding: 15px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #667eea;
+            flex-wrap: wrap; gap: 10px;
         }
-
-        .status-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #dc3545;
+        .status-item { display: flex; align-items: center; gap: 8px; }
+        .status-dot {
+            width: 12px; height: 12px; border-radius: 50%; background: #dc3545;
             animation: pulse 2s infinite;
         }
-
-        .status-indicator.connected {
-            background: #28a745;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .config-section {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-
-        .config-section h3 {
-            color: #667eea;
-            margin-bottom: 15px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #333;
-            font-weight: 500;
-        }
-
+        .status-dot.ok { background: #28a745; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        .config-section { background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .config-section h3 { color: #667eea; margin-bottom: 15px; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 4px; color: #333; font-weight: 500; font-size: 14px; }
         input, select {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            border-radius: 5px;
-            font-size: 14px;
-            transition: border-color 0.3s;
+            width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 5px;
+            font-size: 14px; transition: border-color 0.3s;
         }
-
-        input:focus, select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
+        input:focus, select:focus { outline: none; border-color: #667eea; }
+        .button-group { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         button {
-            flex: 1;
-            padding: 15px 25px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            min-width: 150px;
+            flex: 1; padding: 12px 20px; border: none; border-radius: 10px;
+            font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s; min-width: 140px;
         }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-danger {
-            background: #dc3545;
-            color: white;
-        }
-
-        .btn-danger:hover:not(:disabled) {
-            background: #c82333;
-            transform: translateY(-2px);
-        }
-
-        .btn-success {
-            background: #28a745;
-            color: white;
-        }
-
-        .btn-success:hover:not(:disabled) {
-            background: #218838;
-            transform: translateY(-2px);
-        }
-
-        .btn-warning {
-            background: #ffc107;
-            color: #000;
-        }
-
-        .btn-warning:hover:not(:disabled) {
-            background: #e0a800;
-        }
-
-        .recording-indicator {
-            display: none;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            padding: 15px;
-            background: #fff3cd;
-            border-radius: 10px;
-            margin-bottom: 20px;
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.4); }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover:not(:disabled) { background: #c82333; transform: translateY(-2px); }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover:not(:disabled) { background: #218838; transform: translateY(-2px); }
+        .btn-warning { background: #ffc107; color: #000; }
+        .btn-warning:hover:not(:disabled) { background: #e0a800; }
+        .recording-bar {
+            display: none; align-items: center; justify-content: center; gap: 10px;
+            padding: 12px; background: #fff3cd; border-radius: 10px; margin-bottom: 15px;
             border-left: 4px solid #ffc107;
         }
-
-        .recording-indicator.active {
-            display: flex;
+        .recording-bar.show { display: flex; }
+        .rec-dot {
+            width: 14px; height: 14px; background: #dc3545; border-radius: 50%;
+            animation: recpulse 1s infinite;
         }
-
-        .recording-pulse {
-            width: 15px;
-            height: 15px;
-            background: #dc3545;
-            border-radius: 50%;
-            animation: recording-pulse 1s infinite;
-        }
-
-        @keyframes recording-pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.7; }
-        }
-
+        @keyframes recpulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.3);opacity:0.6} }
         .transcript-box {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            max-height: 300px;
-            overflow-y: auto;
+            background: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 20px;
+            max-height: 350px; overflow-y: auto;
         }
-
-        .transcript-box h3 {
-            color: #667eea;
-            margin-bottom: 15px;
+        .transcript-box h3 { color: #667eea; margin-bottom: 15px; }
+        .msg { margin-bottom: 12px; padding: 10px 15px; border-radius: 10px; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        .msg.user { background: #e3f2fd; border-left: 4px solid #2196f3; }
+        .msg.assistant { background: #f3e5f5; border-left: 4px solid #9c27b0; }
+        .msg.fn { background: #fff3cd; border-left: 4px solid #ffc107; font-size: 0.9em; }
+        .msg.err { background: #ffebee; border-left: 4px solid #f44336; }
+        .msg-header { font-weight: bold; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .ts { font-size: 0.8em; color: #999; }
+        .logs {
+            background: #1e1e1e; color: #d4d4d4; border-radius: 10px; padding: 20px;
+            max-height: 350px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px;
         }
-
-        .message {
-            margin-bottom: 15px;
-            padding: 10px 15px;
-            border-radius: 10px;
-            animation: fadeIn 0.3s;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .message.user {
-            background: #e3f2fd;
-            border-left: 4px solid #2196f3;
-        }
-
-        .message.assistant {
-            background: #f3e5f5;
-            border-left: 4px solid #9c27b0;
-        }
-
-        .message.function {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            font-size: 0.9em;
-        }
-
-        .message.error {
-            background: #ffebee;
-            border-left: 4px solid #f44336;
-        }
-
-        .message-header {
-            font-weight: bold;
-            margin-bottom: 5px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .timestamp {
-            font-size: 0.8em;
-            color: #666;
-        }
-
-        .logs-section {
-            background: #1e1e1e;
-            color: #d4d4d4;
-            border-radius: 10px;
-            padding: 20px;
-            max-height: 400px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-        }
-
-        .logs-section h3 {
-            color: #4ec9b0;
-            margin-bottom: 15px;
-        }
-
-        .log-entry {
-            margin-bottom: 8px;
-            padding: 5px;
-            border-radius: 3px;
-        }
-
-        .log-entry.info { color: #4ec9b0; }
-        .log-entry.success { color: #7ec699; }
-        .log-entry.warning { color: #dcdcaa; }
-        .log-entry.error { color: #f48771; }
-
-        .audio-visualizer {
-            display: none;
-            height: 60px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            padding: 10px;
-        }
-
-        .audio-visualizer.active {
-            display: block;
-        }
-
-        canvas {
-            width: 100%;
-            height: 100%;
-        }
-
+        .logs h3 { color: #4ec9b0; margin-bottom: 15px; }
+        .log { margin-bottom: 6px; padding: 3px 5px; border-radius: 3px; }
+        .log.info { color: #4ec9b0; }
+        .log.ok { color: #7ec699; }
+        .log.warn { color: #dcdcaa; }
+        .log.err { color: #f48771; }
         .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px; margin-bottom: 20px;
         }
-
-        .stat-card {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-            border-left: 4px solid #667eea;
-        }
-
-        .stat-value {
-            font-size: 2em;
-            font-weight: bold;
-            color: #667eea;
-        }
-
-        .stat-label {
-            color: #666;
-            font-size: 0.9em;
-            margin-top: 5px;
-        }
+        .stat { background: #f8f9fa; padding: 12px; border-radius: 10px; text-align: center; border-left: 4px solid #667eea; }
+        .stat-val { font-size: 1.8em; font-weight: bold; color: #667eea; }
+        .stat-lbl { color: #666; font-size: 0.85em; margin-top: 4px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎤 Gemini Voice Assistant Test</h1>
-        <p class="subtitle">Real-time voice interaction with Google Gemini 2.5 Flash</p>
+<div class="container">
+    <h1>🎤 Gemini Voice Assistant Test</h1>
+    <p class="subtitle">Real-time voice interaction with Google Gemini 2.5 Flash</p>
 
-        <!-- Status Bar -->
-        <div class="status-bar">
-            <div class="status-item">
-                <span class="status-indicator" id="socketStatus"></span>
-                <span id="socketStatusText">Disconnected</span>
-            </div>
-            <div class="status-item">
-                <span class="status-indicator" id="geminiStatus"></span>
-                <span id="geminiStatusText">Not Connected</span>
-            </div>
-            <div class="status-item">
-                <span id="sessionInfo">No active session</span>
-            </div>
+    <!-- Status -->
+    <div class="status-bar">
+        <div class="status-item"><span class="status-dot" id="sDot1"></span><span id="sTxt1">Socket: Disconnected</span></div>
+        <div class="status-item"><span class="status-dot" id="sDot2"></span><span id="sTxt2">Gemini: Off</span></div>
+        <div class="status-item"><span id="sTxt3">No session</span></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+        <div class="stat"><div class="stat-val" id="cSent">0</div><div class="stat-lbl">Audio Chunks Sent</div></div>
+        <div class="stat"><div class="stat-val" id="cRecv">0</div><div class="stat-lbl">Audio Chunks Recv</div></div>
+        <div class="stat"><div class="stat-val" id="cFn">0</div><div class="stat-lbl">Function Calls</div></div>
+    </div>
+
+    <!-- Config -->
+    <div class="config-section">
+        <h3>⚙️ Configuration</h3>
+        <div class="form-group">
+            <label>Server URL:</label>
+            <input type="text" id="serverUrl" value="http://localhost:3000">
         </div>
-
-        <!-- Statistics -->
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-value" id="audioChunksSent">0</div>
-                <div class="stat-label">Audio Chunks Sent</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="audioChunksReceived">0</div>
-                <div class="stat-label">Audio Chunks Received</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="functionCalls">0</div>
-                <div class="stat-label">Function Calls</div>
-            </div>
+        <div class="form-group">
+            <label>Auth Token:</label>
+            <input type="text" id="authToken" placeholder="Paste your JWT token here">
         </div>
-
-        <!-- Configuration -->
-        <div class="config-section">
-            <h3>⚙️ Configuration</h3>
-            <div class="form-group">
-                <label>Server URL:</label>
-                <input type="text" id="serverUrl" value="http://localhost:3000">
-            </div>
-            <div class="form-group">
-                <label>Auth Token:</label>
-                <input type="text" id="authToken" value="eyJhbGciOiJSUzI1NiIsImtpZCI6IjFjMzIxOTgzNGRhNTBlMjBmYWVhZWE3Yzg2Y2U3YjU1MzhmMTdiZTEiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20veWF0cmFzdXJha3NoYSIsImF1ZCI6InlhdHJhc3VyYWtzaGEiLCJhdXRoX3RpbWUiOjE3Njk2Njg0MjQsInVzZXJfaWQiOiI0SzlZUExqQTBaUDdqTnZxdzVGbUI0SzlQMm4yIiwic3ViIjoiNEs5WVBMakEwWlA3ak52cXc1Rm1CNEs5UDJuMiIsImlhdCI6MTc2OTY2ODQyNCwiZXhwIjoxNzY5NjcyMDI0LCJlbWFpbCI6ImtodkBraHYuY29tIiwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7ImVtYWlsIjpbImtodkBraHYuY29tIl19LCJzaWduX2luX3Byb3ZpZGVyIjoicGFzc3dvcmQifX0.h0XAW0IujnroK_qiZ9RgbXiQGfdo2I7BeXEKqplkSEqoT7MxoepXtDSejL3brfUSGFHfUVNsEjE4aUPdd8L7iiu7V3_NH9WOqU0AqtHwJSXjHPCA9s7tmCnVCYiMLcceIFo-YjH2GoRRuvMMfUVZDaw2rTY_x6M32XKA156MvjQjIpa4FETcA9qSecO_RhleXM3kp2Kvp-ZSPECrFujQ-4JY6W07hXHGR391Mo2RK0O_WRR7DP12FLPOAN1vkSWRkqGelvx9CpfgR7GABVfQZhWpBPG-EXip11fLLXxwKOpVjesWXR2a9YqKcTs0SDN0yGYkiDRS-I9hlv-2Ntmu1A">
-            </div>
-            <div class="form-group">
-                <label>Location (Latitude, Longitude):</label>
-                <input type="text" id="location" value="12.9716, 77.5946" placeholder="12.9716, 77.5946">
-            </div>
-        </div>
-
-        <!-- Control Buttons -->
-        <div class="button-group">
-            <button class="btn-primary" id="connectBtn" onclick="connectSocket()">Connect Socket</button>
-            <button class="btn-danger" id="disconnectBtn" onclick="disconnectSocket()" disabled>Disconnect</button>
-            <button class="btn-success" id="startGeminiBtn" onclick="startGemini()" disabled>Start Gemini</button>
-            <button class="btn-danger" id="stopGeminiBtn" onclick="stopGemini()" disabled>Stop Gemini</button>
-        </div>
-
-        <!-- Voice Control -->
-        <div class="button-group">
-            <button class="btn-warning" id="startRecordingBtn" onclick="startRecording()" disabled>🎤 Start Recording</button>
-            <button class="btn-danger" id="stopRecordingBtn" onclick="stopRecording()" disabled>⏹️ Stop Recording</button>
-            <button class="btn-primary" id="sendTextBtn" onclick="sendTextMessage()" disabled>📝 Send Text</button>
-        </div>
-
-        <!-- Recording Indicator -->
-        <div class="recording-indicator" id="recordingIndicator">
-            <div class="recording-pulse"></div>
-            <span>Recording... Speak now</span>
-        </div>
-
-        <!-- Audio Visualizer -->
-        <div class="audio-visualizer" id="audioVisualizer">
-            <canvas id="visualizerCanvas"></canvas>
-        </div>
-
-        <!-- Transcripts -->
-        <div class="transcript-box">
-            <h3>💬 Conversation</h3>
-            <div id="transcripts">
-                <p style="color: #999; text-align: center;">Conversation will appear here...</p>
-            </div>
-        </div>
-
-        <!-- Logs -->
-        <div class="logs-section">
-            <h3>📋 System Logs</h3>
-            <div id="logs"></div>
+        <div class="form-group">
+            <label>Location (lat, lng):</label>
+            <input type="text" id="location" value="12.9716, 77.5946" placeholder="12.9716, 77.5946">
         </div>
     </div>
 
-    <script>
-        let socket = null;
-        let audioContext = null;
-        let mediaRecorder = null;
-        let isRecording = false;
-        let audioChunks = [];
-        let analyser = null;
-        let dataArray = null;
-        let bufferLength = null;
-        let animationId = null;
+    <!-- Controls -->
+    <div class="button-group">
+        <button class="btn-primary" id="btnConn" onclick="doConnect()">Connect Socket</button>
+        <button class="btn-danger" id="btnDisc" onclick="doDisconnect()" disabled>Disconnect</button>
+        <button class="btn-success" id="btnStart" onclick="doStartGemini()" disabled>Start Gemini</button>
+        <button class="btn-danger" id="btnStop" onclick="doStopGemini()" disabled>Stop Gemini</button>
+    </div>
+    <div class="button-group">
+        <button class="btn-warning" id="btnRec" onclick="doStartRec()" disabled>🎤 Start Recording</button>
+        <button class="btn-danger" id="btnRecStop" onclick="doStopRec()" disabled>⏹️ Stop Recording</button>
+        <button class="btn-primary" id="btnTxt" onclick="doSendText()" disabled>📝 Send Text</button>
+    </div>
 
-        // Statistics
-        let stats = {
-            audioChunksSent: 0,
-            audioChunksReceived: 0,
-            functionCalls: 0
-        };
+    <!-- Recording indicator -->
+    <div class="recording-bar" id="recBar"><div class="rec-dot"></div><span>Recording... speak now</span></div>
 
-        // Logging function
-        function log(message, type = 'info') {
-            const logsDiv = document.getElementById('logs');
-            const timestamp = new Date().toLocaleTimeString();
-            const logEntry = document.createElement('div');
-            logEntry.className = `log-entry ${type}`;
-            logEntry.textContent = `[${timestamp}] ${message}`;
-            logsDiv.appendChild(logEntry);
-            logsDiv.scrollTop = logsDiv.scrollHeight;
-            console.log(`[${type.toUpperCase()}]`, message);
+    <!-- Transcripts -->
+    <div class="transcript-box">
+        <h3>💬 Conversation</h3>
+        <div id="convo"><p style="color:#999;text-align:center">Conversation will appear here...</p></div>
+    </div>
+
+    <!-- Logs -->
+    <div class="logs">
+        <h3>📋 System Logs</h3>
+        <div id="logBox"></div>
+    </div>
+</div>
+
+<script>
+    // ── State ──
+    let socket = null;
+    let audioCtx = null;
+    let mediaStream = null;
+    let scriptNode = null;
+    let sourceNode = null;
+    let isRecording = false;
+    let audioQueue = [];
+    let isPlaying = false;
+    let chunksSent = 0, chunksRecv = 0, fnCalls = 0;
+
+    // ── Logging ──
+    function log(msg, type = 'info') {
+        const box = document.getElementById('logBox');
+        const d = document.createElement('div');
+        d.className = `log ${type}`;
+        d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        box.appendChild(d);
+        box.scrollTop = box.scrollHeight;
+        console.log(`[${type.toUpperCase()}]`, msg);
+    }
+
+    function addMsg(type, text, meta) {
+        const box = document.getElementById('convo');
+        if (box.querySelector('p[style]')) box.innerHTML = '';
+        const icons = { user: '👤 You', assistant: '🤖 Gemini', fn: '⚙️ Function', err: '❌ Error' };
+        const d = document.createElement('div');
+        d.className = `msg ${type}`;
+        d.innerHTML = `<div class="msg-header"><span>${icons[type] || type}</span><span class="ts">${new Date().toLocaleTimeString()}</span></div><div>${text}</div>`;
+        if (meta) d.innerHTML += `<div style="font-size:0.85em;color:#666;margin-top:4px;white-space:pre-wrap">${meta}</div>`;
+        box.appendChild(d);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function updateStats() {
+        document.getElementById('cSent').textContent = chunksSent;
+        document.getElementById('cRecv').textContent = chunksRecv;
+        document.getElementById('cFn').textContent = fnCalls;
+    }
+
+    // ── UI helpers ──
+    function setSocketUI(connected) {
+        document.getElementById('sDot1').classList.toggle('ok', connected);
+        document.getElementById('sTxt1').textContent = connected ? 'Socket: Connected' : 'Socket: Disconnected';
+        document.getElementById('btnConn').disabled = connected;
+        document.getElementById('btnDisc').disabled = !connected;
+        document.getElementById('btnStart').disabled = !connected;
+        if (!connected) setGeminiUI(false);
+    }
+
+    function setGeminiUI(connected) {
+        document.getElementById('sDot2').classList.toggle('ok', connected);
+        document.getElementById('sTxt2').textContent = connected ? 'Gemini: Connected' : 'Gemini: Off';
+        document.getElementById('sTxt3').textContent = connected ? 'Session active' : 'No session';
+        document.getElementById('btnStart').disabled = connected;
+        document.getElementById('btnStop').disabled = !connected;
+        document.getElementById('btnRec').disabled = !connected;
+        document.getElementById('btnTxt').disabled = !connected;
+        if (!connected) {
+            document.getElementById('btnRecStop').disabled = true;
+            document.getElementById('recBar').classList.remove('show');
         }
+    }
 
-        // Add message to transcript
-        function addMessage(type, content, metadata = '') {
-            const transcriptsDiv = document.getElementById('transcripts');
-            if (transcriptsDiv.querySelector('p[style*="color: #999"]')) {
-                transcriptsDiv.innerHTML = '';
+    // ── Socket connection ──
+    function doConnect() {
+        const url = document.getElementById('serverUrl').value.trim();
+        const token = document.getElementById('authToken').value.trim();
+        if (!token) { log('Auth token is required!', 'err'); return; }
+
+        log('Connecting to socket server...');
+        socket = io(`${url}/user`, { query: { token }, transports: ['websocket', 'polling'], reconnection: true, reconnectionAttempts: 5, timeout: 10000 });
+
+        socket.on('connect', () => { log('✅ Socket connected (id: ' + socket.id + ')', 'ok'); setSocketUI(true); });
+        socket.on('disconnect', (reason) => { log('❌ Socket disconnected: ' + reason, 'err'); setSocketUI(false); });
+        socket.on('connect_error', (err) => { log('Socket connect_error: ' + err.message, 'err'); });
+        socket.on('error', (err) => { log('Socket error: ' + (err.message || JSON.stringify(err)), 'err'); });
+
+        // ── Gemini events ──
+        socket.on('gemini:connected', (d) => {
+            log('✅ Gemini AI connected', 'ok');
+            setGeminiUI(true);
+            addMsg('assistant', 'Gemini voice assistant is ready! Start speaking or send text.');
+        });
+        socket.on('gemini:session-created', (d) => { log('Session created: ' + (d.sessionId || ''), 'ok'); });
+        socket.on('gemini:disconnected', (d) => {
+            log('Gemini disconnected: ' + (d.message || ''), 'warn');
+            setGeminiUI(false);
+        });
+        socket.on('gemini:audio-delta', (d) => {
+            chunksRecv++; updateStats();
+            queueAudio(d.audio);
+        });
+        socket.on('gemini:audio-done', () => { log('Audio response done', 'ok'); });
+        socket.on('gemini:text-response', (d) => {
+            log('Text response: ' + d.text, 'ok');
+            addMsg('assistant', d.text);
+        });
+        socket.on('gemini:transcript-delta', (d) => { log('Transcript delta: ' + d.delta, 'info'); });
+        socket.on('gemini:transcript-done', (d) => {
+            if (d.transcript) {
+                log('AI transcript: ' + d.transcript, 'ok');
+                addMsg('assistant', d.transcript);
             }
+        });
+        socket.on('gemini:user-transcript', (d) => {
+            log('You said: ' + d.transcript, 'info');
+            addMsg('user', d.transcript);
+        });
+        socket.on('gemini:speech-started', () => { log('Speech interrupted', 'info'); });
+        socket.on('gemini:function-calling', (d) => { fnCalls++; updateStats(); log('Calling: ' + d.function, 'warn'); addMsg('fn', 'Calling: ' + d.function); });
+        socket.on('gemini:function-executing', (d) => { log('Executing: ' + d.function, 'warn'); addMsg('fn', 'Executing: ' + d.function, JSON.stringify(d.args, null, 2)); });
+        socket.on('gemini:function-result', (d) => { log('Result: ' + d.function, 'ok'); addMsg('fn', 'Result from ' + d.function, JSON.stringify(d.result, null, 2)); });
+        socket.on('gemini:sos-confirmed', (d) => { log('🚨 SOS confirmed: ' + d.alertId, 'err'); addMsg('err', 'SOS Alert Triggered! ID: ' + d.alertId); });
+        socket.on('gemini:sos-error', (d) => { log('SOS error: ' + d.message, 'err'); addMsg('err', 'SOS Error: ' + d.message); });
+        socket.on('gemini:error', (d) => { log('Gemini error: ' + d.message + (d.code ? ' [' + d.code + ']' : ''), 'err'); addMsg('err', d.message); });
+        socket.on('gemini:text-sent', () => { log('Text sent', 'ok'); });
+        socket.on('gemini:location-updated', () => { log('Location updated', 'ok'); });
+    }
 
-            const message = document.createElement('div');
-            message.className = `message ${type}`;
-            
-            const header = document.createElement('div');
-            header.className = 'message-header';
-            
-            let icon = '';
-            let label = '';
-            if (type === 'user') {
-                icon = '👤';
-                label = 'You';
-            } else if (type === 'assistant') {
-                icon = '🤖';
-                label = 'Gemini';
-            } else if (type === 'function') {
-                icon = '⚙️';
-                label = 'Function Call';
-            } else if (type === 'error') {
-                icon = '❌';
-                label = 'Error';
-            }
+    function doDisconnect() {
+        if (isRecording) doStopRec();
+        if (socket) { socket.disconnect(); socket = null; }
+        setSocketUI(false);
+    }
 
-            header.innerHTML = `
-                <span>${icon} ${label}</span>
-                <span class="timestamp">${new Date().toLocaleTimeString()}</span>
-            `;
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.textContent = content;
-            if (metadata) {
-                const metaDiv = document.createElement('div');
-                metaDiv.style.fontSize = '0.85em';
-                metaDiv.style.color = '#666';
-                metaDiv.style.marginTop = '5px';
-                metaDiv.textContent = metadata;
-                contentDiv.appendChild(metaDiv);
-            }
+    // ── Gemini session ──
+    function doStartGemini() {
+        const loc = document.getElementById('location').value.split(',').map(s => parseFloat(s.trim()));
+        if (loc.length !== 2 || isNaN(loc[0]) || isNaN(loc[1])) { log('Invalid location! Use: lat, lng', 'err'); return; }
+        log('Starting Gemini session...');
+        socket.emit('gemini:connect', { latitude: loc[0], longitude: loc[1], settings: { voice: 'Aoede' } });
+    }
 
-            message.appendChild(header);
-            message.appendChild(contentDiv);
-            transcriptsDiv.appendChild(message);
-            transcriptsDiv.scrollTop = transcriptsDiv.scrollHeight;
-        }
+    function doStopGemini() {
+        if (isRecording) doStopRec();
+        log('Stopping Gemini session...');
+        socket.emit('gemini:disconnect');
+    }
 
-        // Update statistics
-        function updateStats() {
-            document.getElementById('audioChunksSent').textContent = stats.audioChunksSent;
-            document.getElementById('audioChunksReceived').textContent = stats.audioChunksReceived;
-            document.getElementById('functionCalls').textContent = stats.functionCalls;
-        }
-
-        // Connect to socket
-        function connectSocket() {
-            const serverUrl = document.getElementById('serverUrl').value;
-            const token = document.getElementById('authToken').value;
-
-            log('Connecting to socket server...', 'info');
-
-            socket = io(`${serverUrl}/user`, {
-                query: { token },
-                transports: ['websocket', 'polling']
+    // ── Audio Recording (PCM16 16kHz mono → base64) ──
+    async function doStartRec() {
+        try {
+            // Gemini Live API expects 16kHz PCM16 mono
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
             });
+            log('Microphone access granted (16kHz)', 'ok');
 
-            // Socket events
-            socket.on('connect', () => {
-                log('✅ Socket connected', 'success');
-                document.getElementById('socketStatus').classList.add('connected');
-                document.getElementById('socketStatusText').textContent = 'Connected';
-                document.getElementById('connectBtn').disabled = true;
-                document.getElementById('disconnectBtn').disabled = false;
-                document.getElementById('startGeminiBtn').disabled = false;
-            });
+            sourceNode = audioCtx.createMediaStreamSource(mediaStream);
 
-            socket.on('disconnect', () => {
-                log('❌ Socket disconnected', 'error');
-                document.getElementById('socketStatus').classList.remove('connected');
-                document.getElementById('socketStatusText').textContent = 'Disconnected';
-                document.getElementById('geminiStatus').classList.remove('connected');
-                document.getElementById('geminiStatusText').textContent = 'Not Connected';
-                document.getElementById('connectBtn').disabled = false;
-                document.getElementById('disconnectBtn').disabled = true;
-                document.getElementById('startGeminiBtn').disabled = true;
-                document.getElementById('stopGeminiBtn').disabled = true;
-                document.getElementById('startRecordingBtn').disabled = true;
-                document.getElementById('sendTextBtn').disabled = true;
-            });
-
-            socket.on('error', (error) => {
-                log(`Socket error: ${error.message || JSON.stringify(error)}`, 'error');
-                addMessage('error', error.message || JSON.stringify(error));
-            });
-
-            // Gemini events
-            socket.on('gemini:connected', (data) => {
-                log('✅ Gemini AI connected', 'success');
-                document.getElementById('geminiStatus').classList.add('connected');
-                document.getElementById('geminiStatusText').textContent = 'Connected';
-                document.getElementById('sessionInfo').textContent = `Session: ${data.userId}`;
-                document.getElementById('startGeminiBtn').disabled = true;
-                document.getElementById('stopGeminiBtn').disabled = false;
-                document.getElementById('startRecordingBtn').disabled = false;
-                document.getElementById('sendTextBtn').disabled = false;
-                addMessage('assistant', 'Gemini voice assistant is ready! You can start speaking.');
-            });
-
-            socket.on('gemini:disconnected', (data) => {
-                log('Gemini AI disconnected', 'warning');
-                document.getElementById('geminiStatus').classList.remove('connected');
-                document.getElementById('geminiStatusText').textContent = 'Not Connected';
-                document.getElementById('sessionInfo').textContent = 'No active session';
-                document.getElementById('startGeminiBtn').disabled = false;
-                document.getElementById('stopGeminiBtn').disabled = true;
-                document.getElementById('startRecordingBtn').disabled = true;
-                document.getElementById('stopRecordingBtn').disabled = true;
-                document.getElementById('sendTextBtn').disabled = true;
-            });
-
-            socket.on('gemini:session-created', (data) => {
-                log(`Session created: ${data.sessionId}`, 'success');
-            });
-
-            socket.on('gemini:audio-delta', (data) => {
-                stats.audioChunksReceived++;
-                updateStats();
-                log(`Received audio chunk (${data.audio.length} bytes)`, 'info');
-                playAudioChunk(data.audio);
-            });
-
-            socket.on('gemini:audio-done', () => {
-                log('Audio response completed', 'success');
-                document.getElementById('audioVisualizer').classList.remove('active');
-            });
-
-            socket.on('gemini:transcript-delta', (data) => {
-                log(`Transcript delta: ${data.delta}`, 'info');
-            });
-
-            socket.on('gemini:transcript-done', (data) => {
-                log(`Complete transcript: ${data.transcript}`, 'success');
-                addMessage('assistant', data.transcript);
-            });
-
-            socket.on('gemini:user-transcript', (data) => {
-                log(`User said: ${data.transcript}`, 'info');
-                addMessage('user', data.transcript);
-            });
-
-            socket.on('gemini:speech-started', () => {
-                log('Speech detection started', 'info');
-            });
-
-            socket.on('gemini:speech-stopped', () => {
-                log('Speech detection stopped', 'info');
-            });
-
-            socket.on('gemini:function-calling', (data) => {
-                stats.functionCalls++;
-                updateStats();
-                log(`Function calling: ${data.function}`, 'warning');
-                addMessage('function', `Calling: ${data.function}`);
-            });
-
-            socket.on('gemini:function-executing', (data) => {
-                log(`Executing: ${data.function} with args: ${JSON.stringify(data.args)}`, 'warning');
-                addMessage('function', `Executing: ${data.function}`, `Args: ${JSON.stringify(data.args, null, 2)}`);
-            });
-
-            socket.on('gemini:function-result', (data) => {
-                log(`Function result: ${data.function}`, 'success');
-                addMessage('function', `Result from ${data.function}`, JSON.stringify(data.result, null, 2));
-            });
-
-            socket.on('gemini:sos-confirmed', (data) => {
-                log('🚨 SOS alert confirmed', 'error');
-                addMessage('error', `SOS Alert Triggered! Alert ID: ${data.alertId}`, data.message);
-            });
-
-            socket.on('gemini:sos-error', (data) => {
-                log(`SOS error: ${data.message}`, 'error');
-                addMessage('error', `SOS Error: ${data.message}`);
-            });
-
-            socket.on('gemini:error', (data) => {
-                log(`Gemini error: ${data.message}`, 'error');
-                addMessage('error', data.message);
-            });
-
-            socket.on('gemini:text-sent', (data) => {
-                log('Text message sent to Gemini', 'success');
-            });
-
-            socket.on('gemini:location-updated', (data) => {
-                log('Location updated', 'success');
-            });
-        }
-
-        // Disconnect socket
-        function disconnectSocket() {
-            if (socket) {
-                socket.disconnect();
-                socket = null;
-            }
-        }
-
-        // Start Gemini session
-        function startGemini() {
-            const locationInput = document.getElementById('location').value;
-            const [lat, lng] = locationInput.split(',').map(s => parseFloat(s.trim()));
-
-            if (isNaN(lat) || isNaN(lng)) {
-                log('Invalid location format. Use: latitude, longitude', 'error');
-                return;
-            }
-
-            log('Starting Gemini session...', 'info');
-
-            socket.emit('gemini:connect', {
-                latitude: lat,
-                longitude: lng,
-                settings: {
-                    voice: 'shimmer',
-                    language: 'en'
+            // ScriptProcessorNode for raw PCM access (4096 samples per buffer)
+            scriptNode = audioCtx.createScriptProcessor(4096, 1, 1);
+            scriptNode.onaudioprocess = (e) => {
+                if (!isRecording) return;
+                const float32 = e.inputBuffer.getChannelData(0);
+                // Convert Float32 to Int16 (PCM16)
+                const int16 = new Int16Array(float32.length);
+                for (let i = 0; i < float32.length; i++) {
+                    const s = Math.max(-1, Math.min(1, float32[i]));
+                    int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                 }
-            });
+                // Convert to base64
+                const bytes = new Uint8Array(int16.buffer);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                const b64 = btoa(binary);
+
+                // Send audio chunk to server
+                socket.emit('gemini:audio', { audio: b64 });
+                chunksSent++; updateStats();
+            };
+
+            sourceNode.connect(scriptNode);
+            scriptNode.connect(audioCtx.destination);
+            isRecording = true;
+
+            document.getElementById('recBar').classList.add('show');
+            document.getElementById('btnRec').disabled = true;
+            document.getElementById('btnRecStop').disabled = false;
+            log('🎤 Recording started (streaming PCM16 16kHz)', 'ok');
+
+        } catch (err) {
+            log('Mic error: ' + err.message, 'err');
+            addMsg('err', 'Failed to start recording: ' + err.message);
+        }
+    }
+
+    function doStopRec() {
+        isRecording = false;
+        if (scriptNode) { scriptNode.disconnect(); scriptNode = null; }
+        if (sourceNode) { sourceNode.disconnect(); sourceNode = null; }
+        if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+        if (audioCtx) { audioCtx.close(); audioCtx = null; }
+
+        // Tell server we're done speaking
+        if (socket && socket.connected) {
+            socket.emit('gemini:audio-commit');
+            log('Audio committed (end of speech)', 'ok');
         }
 
-        // Stop Gemini session
-        function stopGemini() {
-            if (isRecording) {
-                stopRecording();
-            }
-            log('Stopping Gemini session...', 'info');
-            socket.emit('gemini:disconnect');
-        }
+        document.getElementById('recBar').classList.remove('show');
+        document.getElementById('btnRec').disabled = false;
+        document.getElementById('btnRecStop').disabled = true;
+        log('🎤 Recording stopped', 'ok');
+    }
 
-        // Initialize audio context
-        async function initAudioContext() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-                log('Audio context initialized (24kHz)', 'success');
-            }
-        }
+    // ── Audio Playback (PCM16 base64 → speaker) ──
+    // Queue-based to avoid overlapping chunks
+    function queueAudio(b64) {
+        audioQueue.push(b64);
+        if (!isPlaying) playNext();
+    }
 
-        // Start recording
-        async function startRecording() {
-            try {
-                await initAudioContext();
+    async function playNext() {
+        if (audioQueue.length === 0) { isPlaying = false; return; }
+        isPlaying = true;
+        const b64 = audioQueue.shift();
+        try {
+            // Gemini returns audio/pcm at 24kHz by default in audio responses
+            const playCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+            const raw = atob(b64);
+            const bytes = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
 
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: {
-                        sampleRate: 24000,
-                        channelCount: 1,
-                        echoCancellation: true,
-                        noiseSuppression: true
-                    } 
-                });
-
-                log('Microphone access granted', 'success');
-
-                // Setup visualizer
-                const source = audioContext.createMediaStreamSource(stream);
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 2048;
-                bufferLength = analyser.frequencyBinCount;
-                dataArray = new Uint8Array(bufferLength);
-                source.connect(analyser);
-                
-                document.getElementById('audioVisualizer').classList.add('active');
-                visualize();
-
-                // Setup MediaRecorder for PCM16 encoding
-                mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: 'audio/webm'
-                });
-
-                audioChunks = [];
-
-                mediaRecorder.ondataavailable = async (event) => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
-                    }
-                };
-
-                mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const arrayBuffer = await audioBlob.arrayBuffer();
-                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                    
-                    // Convert to PCM16
-                    const pcm16 = convertToPCM16(audioBuffer);
-                    const base64Audio = arrayBufferToBase64(pcm16);
-                    
-                    // Send to server
-                    socket.emit('gemini:audio', { audio: base64Audio });
-                    stats.audioChunksSent++;
-                    updateStats();
-                    log(`Sent audio chunk (${base64Audio.length} bytes)`, 'info');
-
-                    // Commit audio
-                    socket.emit('gemini:audio-commit');
-                    log('Audio committed', 'info');
-                };
-
-                mediaRecorder.start();
-                isRecording = true;
-
-                document.getElementById('recordingIndicator').classList.add('active');
-                document.getElementById('startRecordingBtn').disabled = true;
-                document.getElementById('stopRecordingBtn').disabled = false;
-
-                log('🎤 Recording started', 'success');
-
-            } catch (error) {
-                log(`Microphone error: ${error.message}`, 'error');
-                addMessage('error', `Failed to start recording: ${error.message}`);
-            }
-        }
-
-        // Stop recording
-        function stopRecording() {
-            if (mediaRecorder && isRecording) {
-                mediaRecorder.stop();
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                isRecording = false;
-
-                document.getElementById('recordingIndicator').classList.remove('active');
-                document.getElementById('startRecordingBtn').disabled = false;
-                document.getElementById('stopRecordingBtn').disabled = true;
-
-                if (animationId) {
-                    cancelAnimationFrame(animationId);
-                    animationId = null;
-                }
-
-                log('🎤 Recording stopped', 'success');
-            }
-        }
-
-        // Visualize audio
-        function visualize() {
-            const canvas = document.getElementById('visualizerCanvas');
-            const canvasCtx = canvas.getContext('2d');
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-
-            function draw() {
-                animationId = requestAnimationFrame(draw);
-
-                analyser.getByteTimeDomainData(dataArray);
-
-                canvasCtx.fillStyle = '#f8f9fa';
-                canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-
-                canvasCtx.lineWidth = 2;
-                canvasCtx.strokeStyle = '#667eea';
-                canvasCtx.beginPath();
-
-                const sliceWidth = canvas.width / bufferLength;
-                let x = 0;
-
-                for (let i = 0; i < bufferLength; i++) {
-                    const v = dataArray[i] / 128.0;
-                    const y = v * canvas.height / 2;
-
-                    if (i === 0) {
-                        canvasCtx.moveTo(x, y);
-                    } else {
-                        canvasCtx.lineTo(x, y);
-                    }
-
-                    x += sliceWidth;
-                }
-
-                canvasCtx.lineTo(canvas.width, canvas.height / 2);
-                canvasCtx.stroke();
+            const int16 = new Int16Array(bytes.buffer);
+            const float32 = new Float32Array(int16.length);
+            for (let i = 0; i < int16.length; i++) {
+                float32[i] = int16[i] / (int16[i] < 0 ? 0x8000 : 0x7FFF);
             }
 
-            draw();
+            const buf = playCtx.createBuffer(1, float32.length, 24000);
+            buf.getChannelData(0).set(float32);
+            const src = playCtx.createBufferSource();
+            src.buffer = buf;
+            src.connect(playCtx.destination);
+            src.onended = () => { playCtx.close(); playNext(); };
+            src.start();
+        } catch (err) {
+            log('Playback error: ' + err.message, 'err');
+            playNext();
         }
+    }
 
-        // Convert to PCM16
-        function convertToPCM16(audioBuffer) {
-            const samples = audioBuffer.getChannelData(0);
-            const pcm16 = new Int16Array(samples.length);
-            
-            for (let i = 0; i < samples.length; i++) {
-                const s = Math.max(-1, Math.min(1, samples[i]));
-                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-            }
-            
-            return pcm16.buffer;
+    // ── Send Text ──
+    function doSendText() {
+        const text = prompt('Enter your message:');
+        if (text && text.trim()) {
+            socket.emit('gemini:text', { text: text.trim() });
+            addMsg('user', text.trim());
+            log('Sent text: ' + text.trim(), 'info');
         }
+    }
 
-        // Array buffer to base64
-        function arrayBufferToBase64(buffer) {
-            let binary = '';
-            const bytes = new Uint8Array(buffer);
-            const len = bytes.byteLength;
-            for (let i = 0; i < len; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            return btoa(binary);
-        }
-
-        // Play audio chunk
-        async function playAudioChunk(base64Audio) {
-            try {
-                await initAudioContext();
-                
-                const binaryString = atob(base64Audio);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-
-                const int16Array = new Int16Array(bytes.buffer);
-                const float32Array = new Float32Array(int16Array.length);
-                
-                for (let i = 0; i < int16Array.length; i++) {
-                    float32Array[i] = int16Array[i] / (int16Array[i] < 0 ? 0x8000 : 0x7FFF);
-                }
-
-                const audioBuffer = audioContext.createBuffer(1, float32Array.length, 24000);
-                audioBuffer.getChannelData(0).set(float32Array);
-
-                const source = audioContext.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(audioContext.destination);
-                source.start();
-
-                document.getElementById('audioVisualizer').classList.add('active');
-            } catch (error) {
-                log(`Error playing audio: ${error.message}`, 'error');
-            }
-        }
-
-        // Send text message
-        function sendTextMessage() {
-            const text = prompt('Enter your message:');
-            if (text && text.trim()) {
-                log(`Sending text: ${text}`, 'info');
-                socket.emit('gemini:text', { text: text.trim() });
-                addMessage('user', text.trim());
-            }
-        }
-
-        // Initialize
-        log('🚀 Gemini Voice Assistant Test Ready', 'success');
-        log('Click "Connect Socket" to begin', 'info');
-    </script>
+    // ── Init ──
+    log('🚀 Gemini Voice Assistant Test Ready', 'ok');
+    log('1. Paste your Auth Token → 2. Connect Socket → 3. Start Gemini → 4. Record or Send Text', 'info');
+</script>
 </body>
 </html>
